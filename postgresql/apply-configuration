@@ -1,0 +1,65 @@
+#!/usr/bin/env ansible-playbook
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# add/remove users, roles, databases based on the site configuration
+---     
+- name: discovering all {{ application }} nodes
+  hosts: localhost
+  tasks:
+    - ec2_remote_facts:
+        region: "{{ ec2_region }}"
+        filters:
+          instance-state-name: running
+          "tag:Application": "{{ application }}"
+          "tag:Domain": "{{ domain }}"
+          "tag:Project": "{{ project }}"
+          "tag:Tenant": "{{ tenant }}"
+          "tag:Cluster": "{{ cluster }}"
+          "tag:Role": "master"
+      register: postgresql_instances
+      when:
+        - cloud == 'aws'
+
+    - name: building {{ application }} host group
+      add_host: hostname="{{ item }}" groupname="{{ application }}" ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ ec2_region }}-{{ project }}-{{ application }}-{{ domain }}-private-key.pem"
+      with_items: "{{ postgresql_instances.instances|map(attribute='private_ip_address')|list }}"
+      when:
+        - postgresql_instances.instances|length > 0
+
+- name: updating {{ application }} users and databases
+  hosts: "{{ application }}"
+  vars_files:
+      - "{{ tenant_config_path }}/config/site.yml"
+  gather_facts: no
+  tasks:
+    - block:
+      - postgresql_db:
+          name: "{{ item.name }}"
+          lc_collate: "{{ item.lc_collate | default('en_US.UTF-8') }}"
+          lc_ctype: "{{ item.lc_ctype | default('en_US.UTF-8') }}"
+          encoding: "{{ item.encoding | default('UTF-8') }}"
+          template: "{{ item.template | default('template0') }}"
+          login_host: "{{ item.login_host | default('localhost') }}"
+          login_password: "{{ item.login_password | default(omit) }}"
+          login_user: "{{ item.login_user | default('postgres') }}"
+          login_unix_socket: "{{ item.login_unix_socket | default('/var/run/postgresql') }}"
+          port: "{{ item.port | default(omit) }}"
+          state: "{{ item.state | default('present') }}"
+        with_items: "{{ postgresql_databases }}"
+        
+      - postgresql_user:
+          name: "{{ item.name }}"
+          password: "{{ item.password | default(omit) }}"
+          priv: "{{ item.priv | default(omit) }}"
+          role_attr_flags: "{{ item.role_attr_flags | default(omit) }}"
+          db: "{{ item.db | default(omit) }}"
+          login_host: "{{ item.login_host | default('localhost') }}"
+          login_password: "{{ item.login_password | default(omit) }}"
+          login_user: "{{ item.login_user | default('postgres') }}"
+          login_unix_socket: "{{ item.login_unix_socket | default('/var/run/postgresql') }}"
+          port: "{{ item.port | default(omit) }}"
+          state: "{{ item.state | default('present') }}"
+        with_items: "{{ postgresql_users }}"
+      no_log: true
+      become_user: "{{ postgresql_user | default('postgres')}}"
+      become: true

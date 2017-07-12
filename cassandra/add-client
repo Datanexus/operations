@@ -46,7 +46,7 @@
 - name: install JCE packages for {{ application }} encryption
   hosts: "{{ application }}"
   vars_files:
-      - vars/{{ application }}.yml
+#      - vars/{{ application }}.yml
       - "{{ tenant_config_path }}/config/site.yml"
   gather_facts: yes
   roles:

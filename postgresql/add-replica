@@ -17,8 +17,8 @@
             "tag:Domain": "{{ domain }}"
             "tag:Project": "{{ project }}"
             "tag:Tenant": "{{ tenant }}"
-            "tag:Cluster": "None"
-            "tag:Role": "None"
+            "tag:Cluster": "none"
+            "tag:Role": "none"
         register: postgresql_master
         when:
           - cloud == 'aws'

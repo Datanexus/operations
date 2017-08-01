@@ -1,0 +1,106 @@
+#!/usr/bin/env ansible-playbook
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# add replcia to 1) an existing master 2) an existing master/replica+ pair
+---     
+- name: preparing untagged postgresql nodes
+  hosts: localhost
+  tasks:
+    # there is a fundamental issue here where you can seriously break existing infrastructure if you're stupid
+    - block:
+      - name: searching for existing untagged postgresql instance
+        ec2_remote_facts:
+          region: "{{ ec2_region }}"
+          filters:
+            instance-state-name: running
+            "tag:Application": "postgresql"
+            "tag:Domain": "{{ domain }}"
+            "tag:Project": "{{ project }}"
+            "tag:Tenant": "{{ tenant }}"
+            "tag:Cluster": "None"
+            "tag:Role": "None"
+        register: postgresql_master
+        when:
+          - cloud == 'aws'
+    
+      - name: applying master tag to untagged postgresql instance
+        ec2_tag:
+          region: "{{ ec2_region }}"
+          resource: "{{ item.id }}"
+          state: present
+          tags:
+            Role: master
+            Cluster: a
+        with_items: "{{ postgresql_master.instances }}"
+        when:
+          - postgresql_master.instances|length > 0
+      when:
+        - cluster is not defined
+    
+    - set_fact:
+        cluster: 'a'
+      when:
+        - cluster is not defined
+        
+    - name: searching for existing postgresql masters
+      ec2_remote_facts:
+        region: "{{ ec2_region }}"
+        filters:
+          instance-state-name: running
+          "tag:Application": "postgresql"
+          "tag:Domain": "{{ domain }}"
+          "tag:Project": "{{ project }}"
+          "tag:Tenant": "{{ tenant }}"
+          "tag:Cluster": "{{ cluster }}"
+          "tag:Role": "master"
+      register: postgresql_master
+      when:
+        - cloud == 'aws'
+    
+    - name: building postgresql host group
+      add_host: hostname="{{ item.private_ip_address }}" groupname="postgresql_master" ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ ec2_region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem" id="{{ item.id }}"
+      with_items: "{{ postgresql_master.instances }}"
+      when:
+        - postgresql_master.instances|length > 0
+    
+    # boot replica node based on master
+    # run postgresql mastr code
+        
+# - name: configuring existing master for replication
+#   hosts: postgresql
+#   vars_files:
+#       - "{{ tenant_config_path }}/config/site.yml"
+#   gather_facts: no
+#   tasks:
+    
+#     - block:
+#       - postgresql_db:
+#           name: "{{ item.name }}"
+#           lc_collate: "{{ item.lc_collate | default('en_US.UTF-8') }}"
+#           lc_ctype: "{{ item.lc_ctype | default('en_US.UTF-8') }}"
+#           encoding: "{{ item.encoding | default('UTF-8') }}"
+#           template: "{{ item.template | default('template0') }}"
+#           login_host: "{{ item.login_host | default('localhost') }}"
+#           login_password: "{{ item.login_password | default(omit) }}"
+#           login_user: "{{ item.login_user | default('postgres') }}"
+#           login_unix_socket: "{{ item.login_unix_socket | default('/var/run/postgresql') }}"
+#           port: "{{ item.port | default(omit) }}"
+#           state: "{{ item.state | default('present') }}"
+#         with_items: "{{ postgresql_databases }}"
+#
+#       - postgresql_user:
+#           name: "{{ item.name }}"
+#           password: "{{ item.password | default(omit) }}"
+#           priv: "{{ item.priv | default(omit) }}"
+#           role_attr_flags: "{{ item.role_attr_flags | default(omit) }}"
+#           db: "{{ item.db | default(omit) }}"
+#           login_host: "{{ item.login_host | default('localhost') }}"
+#           login_password: "{{ item.login_password | default(omit) }}"
+#           login_user: "{{ item.login_user | default('postgres') }}"
+#           login_unix_socket: "{{ item.login_unix_socket | default('/var/run/postgresql') }}"
+#           port: "{{ item.port | default(omit) }}"
+#           state: "{{ item.state | default('present') }}"
+#         with_items: "{{ postgresql_users }}"
+#       no_log: true
+#       become_user: "{{ postgresql_user | default('postgres')}}"
+#       become: true

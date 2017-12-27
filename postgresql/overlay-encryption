@@ -1,0 +1,197 @@
+#!/usr/bin/env ansible-playbook
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# overlay master-to-replica, client-to-server encryption over top of an existing postgresql cluster
+---
+- name: discovering shaw
+  hosts: localhost
+  tasks:
+    - block:
+      - ec2_instance_facts:
+          region: "{{ region }}"
+          filters:
+            instance-state-name: running
+            "tag:Domain": "{{ domain }}"
+            "tag:Project": "{{ project }}"
+            "tag:Tenant": "{{ tenant }}"
+            "tag:Application": shaw
+        register: shaw_instances
+
+      - name: building shaw host group
+        add_host: hostname="{{ item }}" groupname=shaw ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-shaw-{{ domain }}-private-key.pem"
+        with_items: "{{ shaw_instances.instances | map(attribute='private_ip_address') | list }}"
+        when:
+          - shaw_instances is defined
+          - shaw_instances.instances | length > 0
+      when:
+        - cloud == 'aws'
+        
+- hosts: shaw
+  gather_facts: yes
+  tasks:
+    - include_vars: "{{ application_path }}/vars/postgresql.yml"
+      when: application_path is defined
+      
+    - include_role:
+        name: clients
+        tasks_from: generate-credentials
+      vars:
+        encrypted_user: "{{ postgresql_user }}"           
+    - include_role:
+        name: clients
+        tasks_from: fetch-credentials
+      vars:
+        src_path: /etc/tls/datanexus/ca
+        dst_path: "{{ key_path }}"
+        subject: CA
+      with_items:
+        - ca-cert.pem
+        - ca-key.pem
+    
+    - include_role:
+        name: clients
+        tasks_from: fetch-credentials
+      vars:
+        src_path: /etc/tls/datanexus/postgresql
+        dst_path: "{{ key_path }}"
+        subject: "{{ postgresql_user }}"
+      with_items:
+        - postgresql-{{ postgresql_user }}.crt
+        - postgresql-{{ postgresql_user }}.key
+      
+- name: discovering postgresql
+  hosts: localhost
+  tasks:
+    - block:
+      - ec2_instance_facts:
+          region: "{{ region }}"
+          filters:
+            instance-state-name: running
+            "tag:Tenant": "{{ tenant }}"
+            "tag:Project": "{{ project }}"
+            "tag:Domain": "{{ domain }}"
+            "tag:Application": postgresql
+            "tag:Cluster": "{{ cluster | default ('a') }}"
+            "tag:Dataflow": "{{ dataflow | default ('none') }}"
+        register: postgresql_instances
+
+      - name: POSTGRESQL ENCRYPTION OVERLAY | building postgresql host group
+        add_host: hostname="{{ item }}" groupname=postgresql ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
+        with_items: "{{ postgresql_instances.instances | map(attribute='private_ip_address') | list }}"
+        when:
+          - postgresql_instances is defined
+          - postgresql_instances.instances | length > 0
+      when:
+        - cloud == 'aws'
+
+- hosts: postgresql
+  gather_facts: yes
+  tasks:
+    # note the obviuous dependecy on having access to the postgresql repo code
+    - include_vars: "{{ application_path }}/vars/postgresql.yml"
+      when: application_path is defined
+         
+    - include_tasks: "{{ application_path }}/roles/postgresql/tasks/interface-facts.yml"
+      when: application_path is defined
+    
+    - include_vars: "{{ application_path }}/vars/postgresql.yml"
+      when: application_path is defined
+    - block:
+      - name: POSTGRESQL ENCRYPTION OVERLAY | distributing CA certificates to all cluster nodes
+        copy:
+          src:  "{{ key_path }}/{{ item }}"
+          dest: "{{ postgresql_data_dir }}"
+          owner: "{{ postgresql_user }}"
+          group: "{{ postgresql_user }}"
+          mode: 0600
+        with_items:
+            - ca-cert.pem
+            - ca-key.pem
+
+      - name: POSTGRESQL ENCRYPTION OVERLAY | ensuring PostgreSQL preferences directory exists
+        file:
+          path: "{{ postgresql_home_dir }}/.postgresql"
+          owner: "{{ postgresql_user }}"
+          group: "{{ postgresql_group }}"
+          state: directory
+          mode: 0700
+        
+      - name: POSTGRESQL ENCRYPTION OVERLAY | distributing {{ postgresql_user }} key to all cluster nodes
+        copy:
+          src:  "{{ key_path }}/postgresql-{{ postgresql_user }}.key"
+          dest: "{{ postgresql_home_dir }}/.postgresql/postgresql.key"
+          owner: "{{ postgresql_user }}"
+          group: "{{ postgresql_user }}"
+          mode: 0600
+      
+      - name: POSTGRESQL ENCRYPTION OVERLAY | distributing {{ postgresql_user }} certificate to all cluster nodes
+        copy:
+          src:  "{{ key_path }}/postgresql-{{ postgresql_user }}.crt"
+          dest: "{{ postgresql_home_dir }}/.postgresql/postgresql.crt"
+          owner: "{{ postgresql_user }}"
+          group: "{{ postgresql_user }}"
+          mode: 0600
+      
+      - name: POSTGRESQL ENCRYPTION OVERLAY | distributing trusted CA certificate to all cluster nodes
+        copy:
+          src:  "{{ key_path }}/ca-cert.pem"
+          dest: "{{ postgresql_home_dir }}/.postgresql/root.crt"
+          owner: "{{ postgresql_user }}"
+          group: "{{ postgresql_user }}"
+          mode: 0600
+
+      - name: POSTGRESQL ENCRYPTION OVERLAY | checking if existing certs are present
+        stat:
+          path: "{{ postgresql_data_dir}}/ca-cert.pem"
+        register: pgdata_server_key
+
+      - name: POSTGRESQL ENCRYPTION OVERLAY | turn on SSL
+        lineinfile:
+          dest: "{{ postgresql_config_path }}/postgresql.conf"
+          regexp: "^#ssl = off"
+          backrefs: yes
+          line: "ssl = on\t\t\t\t# (change requires restart)"
+        when:
+          - pgdata_server_key.stat.exists
+      
+      - name: POSTGRESQL ENCRYPTION OVERLAY | configuring postgresql SSL cert file
+        lineinfile:
+          dest: "{{ postgresql_config_path }}/postgresql.conf"
+          regexp: "^#ssl_cert_file ="
+          backrefs: yes
+          line: "ssl_cert_file = 'ca-cert.pem'\t\t# (change requires restart)"
+        when:
+          - pgdata_server_key.stat.exists
+  
+      - name: POSTGRESQL ENCRYPTION OVERLAY | configuring postgresql SSL key file
+        lineinfile:
+          dest: "{{ postgresql_config_path }}/postgresql.conf"
+          regexp: "^#ssl_key_file ="
+          backrefs: yes
+          line: "ssl_key_file = 'ca-key.pem'\t\t# (change requires restart)"
+        when:
+          - pgdata_server_key.stat.exists
+  
+      - name: POSTGRESQL ENCRYPTION OVERLAY | configure CA root certificate
+        lineinfile:
+          dest: "{{ postgresql_config_path }}/postgresql.conf"
+          regexp: "^#ssl_ca_file ="
+          backrefs: yes
+          line: "ssl_ca_file = 'ca-cert.pem'\t\t# (change requires restart)"
+        when:
+          - pgdata_server_key.stat.exists
+
+      - name: POSTGRESQL ENCRYPTION OVERLAY | setting trusted listener on data network
+        lineinfile:
+          dest: "{{ postgresql_config_path }}/pg_hba.conf"
+          regexp: "^host    all             all             127.0.0.1/32            ident"
+          backrefs: yes
+          line: "hostssl all             all             {{ postgresql_broadcast_interface_ipv4 }}/24            cert clientcert=1"
+        when:
+          - pgdata_server_key.stat.exists
+      
+      - name: POSTGRESQL ENCRYPTION OVERLAY | restarting postgresql to effect changes
+        become: yes
+        systemd: "name={{ postgresql_daemon }} state=restarted daemon_reload=yes"   
+      become: true
+  

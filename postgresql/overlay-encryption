@@ -19,14 +19,14 @@
             "tag:Cluster": "{{ cluster | default ('a') }}"
             "tag:Dataflow": "{{ dataflow | default ('none') }}"
         register: postgresql_replica_instances
-
+  
       - name: POSTGRESQL ENCRYPTION OVERLAY | building postgresql replica host group
         add_host: hostname="{{ item }}" groupname=postgresql_replica ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
         with_items: "{{ postgresql_replica_instances.instances | map(attribute='private_ip_address') | list }}"
         when:
           - postgresql_replica_instances is defined
           - postgresql_replica_instances.instances | length > 0
-          
+ 
       when:
         - cloud == 'aws'
 
@@ -52,20 +52,20 @@
           - shaw_instances.instances | length > 0
       when:
         - cloud == 'aws'
-        
+
 - name: POSTGRESQL ENCRYPTION OVERLAY | shaw
   hosts: shaw
   gather_facts: yes
   tasks:
     - include_vars: "{{ application_path }}/vars/postgresql.yml"
       when: application_path is defined
-      
+
     - include_role:
         name: clients
         tasks_from: generate-credentials
       vars:
         encrypted_user: "{{ postgresql_user }}"   
-    
+
     - include_role:
         name: clients
         tasks_from: fetch-credentials
@@ -76,7 +76,7 @@
       with_items:
         - ca-cert.pem
         - ca-key.pem
-    
+
     - include_role:
         name: clients
         tasks_from: fetch-credentials
@@ -87,18 +87,18 @@
       with_items:
         - postgresql-{{ postgresql_user }}.crt
         - postgresql-{{ postgresql_user }}.key
-    
+
     # we only execute if there is a replica
     - block:
       - set_fact: replica_account="{{ item.name }}"
         with_items: "{{ replication_users }}"
-        
+
       - include_role:
           name: clients
           tasks_from: generate-credentials
         vars:
           encrypted_user: "{{ replica_account }}"
-      
+
       - include_role:
           name: clients
           tasks_from: fetch-credentials
@@ -112,7 +112,7 @@
       when: 
         - groups['postgresql_replica'] is defined
         - groups['postgresql_replica'] | length > 0
-      
+
 - name: POSTGRESQL ENCRYPTION OVERLAY | discovering all postgresql instances
   hosts: localhost
   tasks:
@@ -145,10 +145,10 @@
     # note the obviuous dependecy on having access to the postgresql repo code
     - include_vars: "{{ application_path }}/vars/postgresql.yml"
       when: application_path is defined
-         
+
     - include_tasks: "{{ application_path }}/roles/postgresql/tasks/interface-facts.yml"
       when: application_path is defined
-    
+
     - include_vars: "{{ application_path }}/vars/postgresql.yml"
       when: application_path is defined
 
@@ -171,7 +171,7 @@
           group: "{{ postgresql_group }}"
           state: directory
           mode: 0700
-        
+
       - name: POSTGRESQL ENCRYPTION OVERLAY | distributing {{ postgresql_user }} key to all cluster nodes
         copy:
           src:  "{{ key_path }}/postgresql-{{ postgresql_user }}.key"
@@ -179,7 +179,7 @@
           owner: "{{ postgresql_user }}"
           group: "{{ postgresql_user }}"
           mode: 0600
-      
+
       - name: POSTGRESQL ENCRYPTION OVERLAY | distributing {{ postgresql_user }} certificate to all cluster nodes
         copy:
           src:  "{{ key_path }}/postgresql-{{ postgresql_user }}.crt"
@@ -187,7 +187,7 @@
           owner: "{{ postgresql_user }}"
           group: "{{ postgresql_user }}"
           mode: 0600
-      
+
       - name: POSTGRESQL ENCRYPTION OVERLAY | distributing trusted CA certificate to all cluster nodes
         copy:
           src:  "{{ key_path }}/ca-cert.pem"
@@ -209,7 +209,7 @@
           line: "ssl = on\t\t\t\t# (change requires restart)"
         when:
           - pgdata_server_key.stat.exists
-      
+
       - name: POSTGRESQL ENCRYPTION OVERLAY | configuring postgresql SSL cert file
         lineinfile:
           dest: "{{ postgresql_config_path }}/postgresql.conf"
@@ -218,7 +218,7 @@
           line: "ssl_cert_file = 'ca-cert.pem'\t\t# (change requires restart)"
         when:
           - pgdata_server_key.stat.exists
-  
+
       - name: POSTGRESQL ENCRYPTION OVERLAY | configuring postgresql SSL key file
         lineinfile:
           dest: "{{ postgresql_config_path }}/postgresql.conf"
@@ -227,7 +227,7 @@
           line: "ssl_key_file = 'ca-key.pem'\t\t# (change requires restart)"
         when:
           - pgdata_server_key.stat.exists
-  
+
       - name: POSTGRESQL ENCRYPTION OVERLAY | configure CA root certificate
         lineinfile:
           dest: "{{ postgresql_config_path }}/postgresql.conf"
@@ -240,12 +240,12 @@
       - name: POSTGRESQL ENCRYPTION OVERLAY | setting trusted listener on data network
         lineinfile:
           dest: "{{ postgresql_config_path }}/pg_hba.conf"
-          regexp: "^host    all             all             127.0.0.1/32            ident"
+          regexp: "^host    all             {{ postgresql_user }}        {{ postgresql_broadcast_interface_ipv4 }}/24          trust"
           backrefs: yes
           line: "hostssl all             {{ postgresql_user }}        {{ postgresql_broadcast_interface_ipv4 }}/24          cert clientcert=1"
         when:
           - pgdata_server_key.stat.exists
-          
+
       - name: POSTGRESQL ENCRYPTION OVERLAY | restarting postgresql to effect changes
         systemd: "name={{ postgresql_daemon }} state=restarted daemon_reload=yes"   
 
@@ -274,17 +274,17 @@
         when:
           - postgresql_master_instances is defined
           - postgresql_master_instances.instances | length > 0
-          
+
       when:
         - cloud == 'aws'
-        
+
 - hosts: postgresql_master
   gather_facts: yes
   tasks:
     # note the obviuous dependecy on having access to the postgresql repo code
     - include_vars: "{{ application_path }}/vars/postgresql.yml"
       when: application_path is defined
-         
+
     - include_tasks: "{{ application_path }}/roles/postgresql/tasks/interface-facts.yml"
       when: application_path is defined
       # if there is an replica then enable encryption
@@ -299,27 +299,27 @@
 
       - name: POSTGRESQL MASTER ENCRYPTION OVERLAY | restarting postgresql to effect changes
         systemd: "name={{ postgresql_daemon }} state=restarted daemon_reload=yes"
-        
+
       become: true 
       when: 
         - groups['postgresql_replica'] is defined
         - groups['postgresql_replica'] | length > 0
-        
+
 - hosts: postgresql_replica
   gather_facts: yes
   tasks:
     # note the obviuous dependecy on having access to the postgresql repo code
     - include_vars: "{{ application_path }}/vars/postgresql.yml"
       when: application_path is defined
-         
+
     - include_tasks: "{{ application_path }}/roles/postgresql/tasks/interface-facts.yml"
       when: application_path is defined      
-    
+
     - set_fact: replica_account="{{ item.name }}"
       with_items: "{{ replication_users }}"
-      
+
     - block:
-      
+
       - name: POSTGRESQL REPLICA ENCRYPTION OVERLAY | ensuring PostgreSQL preferences directory exists
         file:
           path: "{{ postgresql_home_dir }}/.postgresql"
@@ -327,7 +327,7 @@
           group: "{{ postgresql_group }}"
           state: directory
           mode: 0700
-        
+
       - name: POSTGRESQL REPLICA ENCRYPTION OVERLAY | distributing {{ replica_account }} key to replica nodes
         copy:
           src:  "{{ key_path }}/postgresql-{{ replica_account }}.key"
@@ -335,7 +335,7 @@
           owner: "{{ postgresql_user }}"
           group: "{{ postgresql_user }}"
           mode: 0600
-      
+
       - name: POSTGRESQL REPLICA ENCRYPTION OVERLAY | distributing {{ replica_account }} certificate to replica nodes
         copy:
           src:  "{{ key_path }}/postgresql-{{ replica_account }}.crt"
@@ -354,13 +354,13 @@
             primary_conninfo = 'host={{ hostvars[item].ansible_eth1.ipv4.address }} port=5432 user=replicator sslmode=require sslcert={{ postgresql_home_dir }}/.postgresql/{{ replica_account }}.crt sslkey={{ postgresql_home_dir }}/.postgresql/{{ replica_account }}.key'
             trigger_file = '/tmp/postgresql.trigger'
         with_items: "{{ groups.postgresql_master }}"
-        
+
       become_user: "{{ postgresql_user | default('postgres')}}"
       become: true
       when: 
         - groups['postgresql_master'] is defined
         - groups['postgresql_master'] | length > 0
-        
+
     - name: POSTGRESQL REPLICA ENCRYPTION OVERLAY | restarting postgresql to effect changes
       systemd: "name={{ postgresql_daemon }} state=restarted daemon_reload=yes"
       become: true

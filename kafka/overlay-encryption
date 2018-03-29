@@ -8,7 +8,7 @@
   hosts: localhost
   tasks:
     - ec2_remote_facts:
-        region: "{{ ec2_region }}"
+        region: "{{ region }}"
         filters:
           instance-state-name: running
           "tag:Application": "{{ application }}"
@@ -20,13 +20,13 @@
         - cloud == 'aws'
 
     - name: building {{ application }} host group
-      add_host: hostname="{{ item }}" groupname="{{ application }}" ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ ec2_region }}-{{ project }}-{{ application }}-{{ domain }}-private-key.pem"
+      add_host: hostname="{{ item }}" groupname="{{ application }}" ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-{{ application }}-{{ domain }}-private-key.pem"
       with_items: "{{ kafka_instances.instances|map(attribute='private_ip_address')|list }}"
       when:
         - kafka_instances.instances|length > 0
     
     - ec2_remote_facts:
-        region: "{{ ec2_region }}"
+        region: "{{ region }}"
         filters:
           instance-state-name: running
           "tag:Application": shaw
@@ -38,24 +38,24 @@
         - cloud == 'aws'
 
     - name: building shaw host group
-      add_host: hostname="{{ item }}" groupname=shaw ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ ec2_region }}-{{ project }}-shaw-{{ domain }}-private-key.pem"
+      add_host: hostname="{{ item }}" groupname=shaw ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-shaw-{{ domain }}-private-key.pem"
       with_items: "{{ shaw_instances.instances|map(attribute='private_ip_address')|list }}"
       when:
         - shaw_instances.instances|length > 0
 
-- name: install JCE packages for {{ application }} encryption
-  hosts: "{{ application }}"
-  vars_files:
-      - vars/{{ application }}.yml
-      - "{{ tenant_config_path }}/config/site.yml"
-  gather_facts: yes
-  roles:
-    - { role: install-packages, package_list: ['epel-release-7-9'], when: ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat' }
+# - name: install JCE packages for {{ application }} encryption
+#   hosts: "{{ application }}"
+#   vars_files:
+#       - "{{ application_path }}/vars/{{ application }}.yml"
+#       - "{{ tenant_config_path }}/config/site.yml"
+#   gather_facts: yes
+#   roles:
+#     - { role: install-packages, package_list: ['epel-release-7-9'], when: ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat' }
 
 - name: creating {{ application }} keystores and truststores
   hosts: shaw
   vars_files:
-      - vars/{{ application }}.yml
+      - "{{ application_path }}/vars/{{ application }}.yml"
       - "{{ tenant_config_path }}/config/site.yml"
   gather_facts: yes
   tasks:
@@ -73,7 +73,7 @@
         when: not kafka_server_key.stat.exists
       
       - name: generating server SSL key and cert into temporary broker keystore
-        command: /usr/bin/keytool -keystore /etc/tls/{{ tenant }}/{{ application }}/kafka.server.keystore.jks -alias localhost -validity {{ duration }} -genkey -keyalg RSA -storepass {{ storepass }} -keypass {{ keypass }} -dname "CN={{ certs.CN }}, OU={{ certs.OU }}, O={{ certs.O }}, L={{ certs.L }}, C={{ certs.C }}" 
+        command: /usr/bin/keytool -keystore /etc/tls/{{ tenant }}/{{ application }}/kafka.server.keystore.jks -alias localhost -validity {{ duration }} -genkey -keyalg RSA -storepass {{ storepass }} -keypass {{ keypass }} -dname "CN={{ certs.CN }}, OU={{ certs.OU }}, O={{ certs.O }}, L={{ certs.L }}, C={{ certs.C }}"
         # when: not kafka_server_key.stat.exists
 
       # - name: checking existing CA key
@@ -111,7 +111,7 @@
      #      paths: /etc/tls/datanexus/kafka
      #      patterns: "ca-certs*"
      #    register: find_all_ca_certs
-        
+
       - name: importing CA certificate into server truststore
         command: /usr/bin/keytool -keystore /etc/tls/{{ tenant }}/{{ application }}/kafka.server.truststore.jks -alias CARoot -import -file /etc/tls/{{ tenant }}/{{ application }}/ca-cert -storepass {{ storepass }} -keypass {{ keypass }} -noprompt
         # when: not kafka_server_trust.stat.exists
@@ -120,7 +120,7 @@
       #   stat:
       #     path: "/etc/tls/{{ tenant }}/{{ application }}/kafka.client.truststore.jks"
       #   register: kafka_client_trust
-      
+
       - name: importing CA certificate into client truststore
         command: /usr/bin/keytool -keystore /etc/tls/{{ tenant }}/{{ application }}/kafka.client.truststore.jks -alias CARoot -import -file /etc/tls/{{ tenant }}/{{ application }}/ca-cert -storepass {{ storepass }} -keypass {{ keypass }} -noprompt
         # when: not kafka_client_trust.stat.exists
@@ -185,8 +185,7 @@
       #   stat:
       #     path: "/etc/tls/{{ tenant }}/{{ application }}/kafka.client.keystore.jks"
       #   register: kafka_client_key
-      
-      - name: generating client SSL key and cert into client keystore      
+      - name: generating client SSL key and cert into client keystore
         command: /usr/bin/keytool -keystore /etc/tls/{{ tenant }}/{{ application }}/kafka.client.keystore.jks -alias localhost -validity {{ duration }} -genkey -keyalg RSA -storepass {{ storepass }} -dname "CN={{ certs.CN }}, OU={{ certs.OU }}, O={{ certs.O }}, L={{ certs.L }}, C={{ certs.C }}"
         # when: not kafka_client_key.stat.exists
 
@@ -260,19 +259,19 @@
           flat: yes
       become: true 
     
-- name: configuring {{ application }} encryption
+- name: KAFKA ENCRYPTION OVERLAY | configuring {{ application }} encryption
   hosts: "{{ application }}"
   vars_files:
-      - vars/{{ application }}.yml
+      - "{{ application_path }}/vars/{{ application }}.yml"
       - "{{ tenant_config_path }}/config/site.yml"
-  gather_facts: yes
+  gather_facts: true
   tasks:
     - name: setting eth0 to all interfaces
       set_fact:
         kafka_interface: "{{ hostvars[inventory_hostname].ansible_eth0.device }}"
         kakfa_interface_ipv4: "{{ hostvars[inventory_hostname].ansible_eth0.ipv4.address }}"
       when: hostvars[inventory_hostname].ansible_eth0 is defined
-
+    
     - name: setting eth1 to kafka public internal
       set_fact:
         kafka_interface: "{{ hostvars[inventory_hostname].ansible_eth1.device }}"

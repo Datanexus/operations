@@ -1,0 +1,82 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# kafka operations wrapper
+---
+- include_vars: "{{ application_path }}/postgresql/vars/postgresql.yml"
+  when: application_path is defined  
+
+- include_vars: "{{ application_path }}/kafka/vars/kafka.yml"
+  when: application_path is defined  
+
+- block:
+  - name: KAFKA CONNECTOR OPERATIONS | ensuring {{ source_application }} stores directory exists
+    file:
+      path: "{{ item }}"
+      owner: "{{ kafka_user }}"
+      group: "{{ kafka_group }}"
+      state: directory
+      mode: 0700
+    with_items:
+      - "/etc/tls/{{ tenant }}/ca"
+      - "/etc/tls/{{ tenant }}/stores"
+      - "/etc/tls/{{ tenant }}/{{ source_application }}"
+
+  - name: KAFKA CONNECTOR OPERATIONS | distributing {{ postgresql_user }} key to all cluster nodes
+    copy:
+      src:  "{{ key_path }}/postgresql-{{ postgresql_user }}.key"
+      dest: "/etc/tls/{{ tenant }}/{{ source_application }}/{{ postgresql_user }}.key"
+      owner: "{{ kafka_user }}"
+      group: "{{ kafka_user }}"
+      mode: 0600
+
+  - name: KAFKA CONNECTOR OPERATIONS | distributing {{ postgresql_user }} certificate to all cluster nodes
+    copy:
+      src:  "{{ key_path }}/postgresql-{{ postgresql_user }}.crt"
+      dest: "/etc/tls/{{ tenant }}/{{ source_application }}/{{ postgresql_user }}.crt"
+      owner: "{{ kafka_user }}"
+      group: "{{ kafka_user }}"
+      mode: 0600
+  
+  - name: KAFKA CONNECTOR OPERATIONS | distributing trusted CA certificate to all cluster nodes
+    copy:
+      src:  "{{ key_path }}/ca-cert.pem"
+      dest: "/etc/tls/{{ tenant }}/ca/ca-cert.pem"
+      owner: "{{ kafka_user }}"
+      group: "{{ kafka_user }}"
+      mode: 0600
+
+  - name: KAFKA CONNECTOR OPERATIONS | checking kafka.client.truststore.jks existence
+    stat:
+      path: "/etc/tls/{{ tenant }}/stores/kafka.client.truststore.jks"
+    register: truststore
+
+  - name: KAFKA CONNECTOR OPERATIONS | removing postgreSQLCACert from kafka.client.truststore.jks
+    command: /bin/keytool -delete -alias postgreSQLCACert -keystore "/etc/tls/{{ tenant }}/stores/kafka.client.truststore.jks" -storepass datanexus
+    when: truststore.stat.exists
+  
+  - name: KAFKA CONNECTOR OPERATIONS | creating /etc/tls/{{ tenant }}/stores/kafka.client.truststore.jks
+    command: /bin/keytool -import -alias postgreSQLCACert -file "/etc/tls/{{ tenant }}/ca/ca-cert.pem" -keystore "/etc/tls/{{ tenant }}/stores/kafka.client.truststore.jks" -storepass datanexus -noprompt
+    become_user: "{{ kafka_user}}"
+  
+  - name: KAFKA CONNECTOR OPERATIONS | combining {{ tenant }} {{ source_application }} credentials
+    command: /bin/openssl pkcs12 -export -inkey "/etc/tls/{{ tenant }}/{{ source_application }}/{{ postgresql_user }}.key" -in "/etc/tls/{{ tenant }}/{{ source_application}}/{{ postgresql_user }}.crt" -name "postgreSQL{{ postgresql_user}}" -out "/tmp/{{ source_application }}-client.p12" -passout pass:datanexus
+    become_user: "{{ kafka_user}}"
+
+  - name: KAFKA CONNECTOR OPERATIONS | checking kafka.client.keystore.jks existence
+    stat:
+      path: "/etc/tls/{{ tenant }}/stores/kafka.client.keystore.jks"
+    register: keystore
+
+  - name: KAFKA CONNECTOR OPERATIONS | removing postgreSQL{{ postgresql_user}} from postgreskafka.client.keystore.jks
+    command: /bin/keytool -delete -alias "postgreSQL{{ postgresql_user}}" -keystore "/etc/tls/{{ tenant }}/stores/kafka.client.keystore.jks" -storepass datanexus
+    when: keystore.stat.exists
+  
+  - name: KAFKA CONNECTOR OPERATIONS | creating /etc/tls/{{ tenant }}/stores/kafka.client.keystore.jks
+    command: /bin/keytool -importkeystore -srckeystore "/tmp/{{ source_application }}-client.p12" -srcstoretype pkcs12 -destkeystore "/etc/tls/{{ tenant }}/stores/kafka.client.keystore.jks" -deststoretype pkcs12 -storepass datanexus -noprompt -srcstorepass datanexus
+    become_user: "{{ kafka_user}}"
+
+  - name: KAFKA CONNECTOR OPERATIONS | removing combined {{ tenant }} {{ source_application }} credentials
+    file:
+      path: "/tmp/{{ source_application }}-client.p12"
+      state: absent
+  become: yes

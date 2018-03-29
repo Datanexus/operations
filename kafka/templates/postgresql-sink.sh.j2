@@ -1,0 +1,3 @@
+#!/bin/sh
+# (c) Copyright 2016 DataNexus Inc.  All Rights Reserved.
+echo '{"name":"postgresql-incremental-sink", "config":{"connector.class":"JdbcSinkConnector","connection.url":"jdbc:postgresql://{{ hostvars[groups['postgresql_sink'].0].ansible_eth1.ipv4.address }}/postgres?user={{ postgresql_user }}&ssl=true","topics":"postgres_t1","auto.create":"true","tasks.max":"10"}}' | curl -X POST -d @- http://{{ hostvars[inventory_hostname].ansible_eth1.ipv4.address }}:8083/connectors --header "Content-Type: application/json"

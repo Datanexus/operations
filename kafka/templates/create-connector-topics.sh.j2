@@ -1,0 +1,20 @@
+#!/bin/sh
+# (c) Copyright 2016 DataNexus Inc.  All Rights Reserved.
+
+# create connnector configuration topic
+/usr/local/bin/list-topics.sh | /usr/bin/grep connect-configs &> /dev/null
+if [ $? != 0 ]; then
+  /usr/bin/kafka-topics --create --zookeeper {{ groups['zookeeper'] | join(':2181,') }}:2181 --replication-factor 1 --partitions 1 --config cleanup.policy=compact --topic connect-configs
+fi
+
+# create connnector offsets topic
+/usr/local/bin/list-topics.sh | /usr/bin/grep connect-offsets &> /dev/null
+if [ $? != 0 ]; then
+    /usr/bin/kafka-topics --create --zookeeper {{ groups['zookeeper'] | join(':2181,') }}:2181 --replication-factor 1 --partitions 50 --config cleanup.policy=compact --topic connect-offsets
+fi
+
+# create connnector status topic
+/usr/local/bin/list-topics.sh | /usr/bin/grep connect-status &> /dev/null
+if [ $? != 0 ]; then
+  /usr/bin/kafka-topics --create --zookeeper {{ groups['zookeeper'] | join(':2181,') }}:2181 --replication-factor 1 --partitions 10 --config cleanup.policy=compact --topic connect-status
+fi

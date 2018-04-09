@@ -1,0 +1,16 @@
+#!/bin/sh
+# (c) Copyright 2016 DataNexus Inc.  All Rights Reserved.
+
+# get list of existing connectors
+/usr/bin/curl -g {{ hostvars[inventory_hostname].ansible_eth0.ipv4.address }}:8083/connectors 2>/dev/null | /usr/bin/python -m json.tool
+
+if [ $? -eq 0 ]; then
+  # connectors
+  for connector in postgresql-t1-source postgresql-t1-sink cassandra-t2-source cassandra-t1-sink; do
+  	/usr/bin/curl -X DELETE {{ hostvars[inventory_hostname].ansible_eth0.ipv4.address }}:8083/connectors/$connector
+  	sleep 2
+  done
+  
+  # we can't delete the connector topics with the connector running so it should be stopped and then topics cleaned
+  sudo /bin/pkill -f org.apache.kafka.connect.cli.ConnectDistributed
+fi

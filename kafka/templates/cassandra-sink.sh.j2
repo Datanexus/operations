@@ -1,0 +1,6 @@
+#!/bin/sh
+# (c) Copyright 2016 DataNexus Inc.  All Rights Reserved.
+/usr/local/bin/list-connectors.sh | /usr/bin/grep cassandra-t1-sink &> /dev/null
+if [ $? != 0 ]; then
+  echo '{"name":"cassandra-t1-sink", "config":{"connector.class":"com.datamountaineer.streamreactor.connect.cassandra.sink.CassandraSinkConnector","connect.cassandra.kcql":"INSERT INTO cassandra_t1 SELECT * FROM postgres_t1","connect.cassandra.port":"9042","connect.cassandra.key.space":"demo","connect.cassandra.consistency.level":"ONE","connect.cassandra.contact.points":"{{ groups['cassandra_public'] | join(',') }}","connect.cassandra.username":"cassandra","connect.cassandra.password":"cassandra","topics":"postgres_t1","tasks.max":"1"}}' | curl -X POST -d @- http://{{ hostvars[inventory_hostname].ansible_eth0.ipv4.address }}:8083/connectors --header "Content-Type: application/json"
+fi

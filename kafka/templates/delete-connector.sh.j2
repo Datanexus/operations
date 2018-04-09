@@ -1,0 +1,12 @@
+#!/bin/sh
+# (c) Copyright 2016 DataNexus Inc.  All Rights Reserved.
+
+if [ $# -eq 1 ]; then
+  /usr/bin/curl -g {{ hostvars[inventory_hostname].ansible_eth0.ipv4.address }}:8083/connectors 2>/dev/null | /usr/bin/python -m json.tool | /usr/bin/grep $1 &> /dev/null
+   if [ $? == 0 ]; then
+     /usr/bin/curl -X DELETE {{ hostvars[inventory_hostname].ansible_eth0.ipv4.address }}:8083/connectors/$1
+   else
+     echo "$1 connector does not exist"
+   fi
+fi
+ 

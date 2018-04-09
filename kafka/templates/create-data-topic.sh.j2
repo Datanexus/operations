@@ -1,0 +1,8 @@
+#!/bin/sh
+# (c) Copyright 2016 DataNexus Inc.  All Rights Reserved.
+
+# create data topics with a 20 minute retention policy
+/usr/local/bin/list-topics.sh | /usr/bin/grep $1 &> /dev/null
+if [ $? != 0 ]; then
+  /usr/bin/kafka-topics --create --zookeeper {{ groups['zookeeper'] | join(':2181,') }}:2181 --replication-factor $3 --partitions $2 --config cleanup.policy=delete --config retention.ms=1200000 --topic $1
+fi

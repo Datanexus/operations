@@ -1,0 +1,14 @@
+#!/bin/sh
+# (c) Copyright 2016 DataNexus Inc.  All Rights Reserved.
+
+# clean three demo topics plus any user specific topics
+for topic in $* connect-configs connect-offsets connect-status; do
+  /usr/local/bin/list-topics.sh | /usr/bin/grep $topic &> /dev/null
+  if [ $? == 0 ]; then
+    /usr/bin/kafka-topics --zookeeper 10.10.1.48:2181,10.10.1.54:2181,10.10.1.60:2181 --delete --topic $topic
+    rm -rf /data/kafka/connect-configs-*
+    rm -rf /data/kafka/connect-offsets-*
+    rm -rf /data/kafka/connect-status-*
+    rm -rf /data/kafka/$topic-*
+  fi
+done

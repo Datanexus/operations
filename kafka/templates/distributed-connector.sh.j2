@@ -1,0 +1,9 @@
+#!/bin/sh
+# (c) Copyright 2016 DataNexus Inc.  All Rights Reserved.
+
+# Workers are long running processes so set an init.d or systemctl service accordingly.
+/usr/bin/pgrep -f org.apache.kafka.connect.cli.ConnectDistributed &> /dev/null
+
+if [ $? != 0 ]; then
+  JAVA_TOOL_OPTIONS="-Djavax.net.ssl.keyStore=/etc/tls/datanexus/postgresql/keystore -Djavax.net.ssl.keyStorePassword={{ store_password }} -Djavax.net.ssl.trustStore=/etc/tls/datanexus/postgresql/truststore -Djavax.net.ssl.trustStorePassword={{ store_password }} -Djavax.net.debug=ssl" /usr/bin/nohup /bin/connect-distributed /etc/kafka/connect-distributed.properties &> /tmp/connector_log &
+fi

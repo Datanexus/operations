@@ -1,0 +1,11 @@
+#!/bin/sh
+# (c) Copyright 2016 DataNexus Inc.  All Rights Reserved.
+
+if [ $# -eq 1 ]; then
+  /usr/bin/kafka-consumer-groups --bootstrap-server {{ hostvars[inventory_hostname].ansible_eth1.ipv4.address }}:9092 --list | /usr/bin/grep $1 &> /dev/null
+   if [ $? == 0 ]; then
+     /usr/bin/kafka-consumer-groups --bootstrap-server {{ hostvars[inventory_hostname].ansible_eth1.ipv4.address }}:9092 --describe --group $1
+   else
+     echo "$1 consumer group does not exist"
+   fi
+fi

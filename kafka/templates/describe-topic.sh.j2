@@ -1,0 +1,8 @@
+#!/bin/sh
+# (c) Copyright 2016 DataNexus Inc.  All Rights Reserved.
+/usr/local/bin/list-topics.sh | /usr/bin/grep $1 &> /dev/null
+if [ $? == 0 ]; then
+  /usr/bin/kafka-topics --describe --zookeeper {{ groups['zookeeper'] | join(':2181,') }}:2181 --topic $1
+else
+  echo "$1 topic does not exist"
+fi

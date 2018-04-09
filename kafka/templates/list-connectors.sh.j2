@@ -1,0 +1,5 @@
+#!/bin/sh
+# (c) Copyright 2016 DataNexus Inc.  All Rights Reserved.
+
+# get list of existing connectors
+/usr/bin/curl -g {{ hostvars[inventory_hostname].ansible_eth0.ipv4.address }}:8083/connectors 2>/dev/null | /usr/bin/python -m json.tool

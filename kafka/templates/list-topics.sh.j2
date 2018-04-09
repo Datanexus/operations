@@ -1,0 +1,3 @@
+#!/bin/sh
+# (c) Copyright 2016 DataNexus Inc.  All Rights Reserved.
+/usr/bin/kafka-topics --zookeeper {{ groups['zookeeper'] | join(':2181,') }}:2181 --list

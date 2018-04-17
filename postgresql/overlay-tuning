@@ -1,0 +1,174 @@
+#!/usr/bin/env ansible-playbook
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# basic tuning settings for postgresql
+#
+# https://www.pgconfig.org/#/tuning?total_ram=4&max_connections=100&environment_name=DW&pg_version=9.6&os_type=Linux&arch=x86-64&drive_type=HDD&share_link=true
+
+# AWS_PROFILE=datanexus ./overlay-tuning -e "cloud=aws region=us-east-2 application=postgresql domain=development project=demo tenant=datanexus key_path=/Users/christopher/Documents/DataNexus/Demos/us-east-2  ansible_user=centos tenant_config_path=/Users/christopher/Documents/DataNexus/Platform/Source/datanexus application_path=/Users/christopher/Documents/DataNexus/Platform/Source/postgresql"
+
+- name: POSTGRESQL TUNING OVERLAY | discovering all postgresql instances
+  hosts: localhost
+  tasks:
+    - block:
+      - ec2_instance_facts:
+          region: "{{ region }}"
+          filters:
+            instance-state-name: running
+            "tag:Domain": "{{ domain }}"
+            "tag:Application": postgresql
+            "tag:Project": "{{ project }}"
+            "tag:Tenant": "{{ tenant }}"
+        register: postgresql_instances
+      
+      - name: POSTGRESQL TUNING OVERLAY | building postgresql source host group
+        add_host: hostname="{{ item }}" groupname=postgresql ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
+        with_items: "{{ postgresql_instances.instances | map(attribute='private_ip_address') | list }}"
+        when:
+          - postgresql_instances is defined
+          - postgresql_instances.instances | length > 0
+      when:
+        - cloud == 'aws'
+
+- name: POSTGRESQL TUNING OVERLAY | tuning all postgresql instances
+  hosts: postgresql
+  vars_files:
+    - "{{ application_path }}/vars/postgresql.yml"
+  gather_facts: yes
+  tasks:
+#    - debug: msg="{{  hostvars[inventory_hostname].ansible_processor_vcpus }}"
+    
+    - block:
+      
+      - name: POSTGRESQL TUNING OVERLAY | disallowing linux to overcommit memory 
+        lineinfile:
+          path: /etc/sysctl.conf
+          regexp: '^vm.overcommit_memory'
+          line: vm.overcommit_memory=2
+      
+      - name: POSTGRESQL TUNING OVERLAY | updating linux overcommit ratio
+        lineinfile:
+          path: /etc/sysctl.conf
+          regexp: '^vm.overcommit_ratio'
+          line: vm.overcommit_ratio=75
+          
+      - name: POSTGRESQL TUNING OVERLAY | applying changes to runtime
+        command: /usr/sbin/sysctl -p
+
+      - name: POSTGRESQL TUNING OVERLAY | configuring postgresql memory shared buffers
+        lineinfile:
+          path: "{{ postgresql_config_path }}/postgresql.conf"
+          regexp: '^shared_buffers = 128MB'
+          line: "shared_buffers = 1GB               # min 128kB"
+          backrefs: yes
+        become_user: "{{ postgresql_user }}"
+      
+      - name: POSTGRESQL TUNING OVERLAY | configuring postgresql memory effective cache
+        lineinfile:
+          path: "{{ postgresql_config_path }}/postgresql.conf"
+          regexp: '^#effective_cache_size = 4GB'
+          line: "effective_cache_size = 3GB"
+          backrefs: yes
+        become_user: "{{ postgresql_user }}"
+      
+      - name: POSTGRESQL TUNING OVERLAY | configuring postgresql memory maintenance worker memory
+        lineinfile:
+          path: "{{ postgresql_config_path }}/postgresql.conf"
+          regexp: '^#maintenance_work_mem = 64MB'
+          line: "maintenance_work_mem = 512MB           # min 1MB"
+          backrefs: yes
+        become_user: "{{ postgresql_user }}"
+      
+      - name: POSTGRESQL TUNING OVERLAY | configuring postgresql checkpoint minimum wal size
+        lineinfile:
+          path: "{{ postgresql_config_path }}/postgresql.conf"
+          regexp: '^#min_wal_size = 80MB'
+          line: "min_wal_size = 2GB"
+          backrefs: yes
+        become_user: "{{ postgresql_user }}"
+
+      - name: POSTGRESQL TUNING OVERLAY | configuring postgresql checkpoint maximum wal size
+        lineinfile:
+          path: "{{ postgresql_config_path }}/postgresql.conf"
+          regexp: '^#max_wal_size = 1GB'
+          line: "max_wal_size = 6GB"
+          backrefs: yes
+        become_user: "{{ postgresql_user }}"
+      
+      - name: POSTGRESQL TUNING OVERLAY | configuring postgresql checkpoint completion target
+        lineinfile:
+          path: "{{ postgresql_config_path }}/postgresql.conf"
+          regexp: '^#checkpoint_completion_target = 0.5'
+          line: "checkpoint_completion_target = 0.9     # checkpoint target duration, 0.0 - 1.0"
+          backrefs: yes
+        become_user: "{{ postgresql_user }}"
+      
+      - name: POSTGRESQL TUNING OVERLAY | configuring postgresql checkpoint wal buffers
+        lineinfile:
+          path: "{{ postgresql_config_path }}/postgresql.conf"
+          regexp: '^#wal_buffers = -1'
+          line: "wal_buffers = 16MB                     # min 32kB, -1 sets based on shared_buffers"
+          backrefs: yes
+        become_user: "{{ postgresql_user }}"
+      
+      - name: POSTGRESQL TUNING OVERLAY | configuring postgresql network connections
+        lineinfile:
+          path: "{{ postgresql_config_path }}/postgresql.conf"
+          regexp: '^max_connections = 100'
+          line: "max_connections = 100                   # (change requires restart)"
+          backrefs: yes
+        become_user: "{{ postgresql_user }}"
+    
+      - name: POSTGRESQL TUNING OVERLAY | configuring postgresql random page cost
+        lineinfile:
+          path: "{{ postgresql_config_path }}/postgresql.conf"
+          regexp: '^#random_page_cost = 4.0'
+          line: "random_page_cost = 4.0                  # same scale as above"
+          backrefs: yes
+        become_user: "{{ postgresql_user }}"
+    
+      - name: POSTGRESQL TUNING OVERLAY | configuring postgresql effective io concurrency
+        lineinfile:
+          path: "{{ postgresql_config_path }}/postgresql.conf"
+          regexp: '^#effective_io_concurrency = 1'
+          line: "effective_io_concurrency = 2           # 1-1000; 0 disables prefetching"
+        backrefs: yes
+        become_user: "{{ postgresql_user }}"
+    
+      - name: POSTGRESQL TUNING OVERLAY | restarting postgresql
+        service:
+          name: "postgresql-{{ postgresql_major_version }}.{{ postgresql_minor_version }}"
+          state: restarted
+          
+      become: true
+
+            # - name: POSTGRESQL TUNING OVERLAY | configuring postgresql default statistics target
+      #         lineinfile:
+      #           path: "{{ postgresql_config_path }}/postgresql.conf"
+      #           regexp: '^#default_statistics_target = 100'
+      #           line: "default_statistics_target = 100         # range 1-10000"
+      #           backrefs: yes
+      #         become_user: "{{ postgresql_user }}"
+   
+      
+           #  - name: POSTGRESQL TUNING OVERLAY | configuring postgresql maximum worker processes
+           #    lineinfile:
+           #      path: "{{ postgresql_config_path }}/postgresql.conf"
+           #      regexp: '^#max_worker_processes = 8'
+           #      line: "max_worker_processes = 2               # (change requires restart)"
+           #      backrefs: yes
+           #    become_user: "{{ postgresql_user }}"
+           #  - name: POSTGRESQL TUNING OVERLAY | configuring postgresql maximum parallel workers per gather
+           #    lineinfile:
+           #      path: "{{ postgresql_config_path }}/postgresql.conf"
+           #      regexp: '^#max_parallel_workers_per_gather = 0'
+           #      line: "max_parallel_workers_per_gather = 1    # taken from max_worker_processes"
+           #      backrefs: yes
+           #    become_user: "{{ postgresql_user }}"
+           #  - name: POSTGRESQL TUNING OVERLAY | configuring postgresql work memory
+           #    lineinfile:
+           #      path: "{{ postgresql_config_path }}/postgresql.conf"
+           #      regexp: '^#work_mem = 4MB'
+           #      line: "work_mem = 4MB                         # min 64kB"
+           #      backrefs: yes
+           #    become_user: "{{ postgresql_user }}"

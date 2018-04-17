@@ -145,7 +145,7 @@
     # note the obviuous dependecy on having access to the postgresql repo code
     - include_vars: "{{ application_path }}/vars/postgresql.yml"
       when: application_path is defined
-
+      
     - include_tasks: "{{ application_path }}/roles/postgresql/tasks/interface-facts.yml"
       when: application_path is defined
 

@@ -226,116 +226,8 @@
   hosts: postgresql
   vars_files:
     - "{{ source_home }}/postgresql/vars/postgresql.yml"
-  gather_facts: yes
   tasks:
-    - block:
-      # this  and let PostgreSQL manage things
-      # this also needs to go into /etc/sysctl.conf
-      - name: KAFKA PRODUCER OVERLAY | turning off the linux memory autocommit
-        command: /usr/sbin/sysctl -w vm.overcommit_memory=2
-      # - name: KAFKA PRODUCER OVERLAY | configuring postgresql max connections
- #        lineinfile:
- #          path: "{{ postgresql_config_path }}/postgresql.conf"
- #          regexp: '^max_connections = 100'
- #          line: "max_connections = 100                   # (change requires restart)"
- #          backrefs: yes
- #        become_user: "{{ postgresql_user }}"
-      #       - name: KAFKA PRODUCER OVERLAY | configuring postgresql shared buffers
-      #         lineinfile:
-      #           path: "{{ postgresql_config_path }}/postgresql.conf"
-      #           regexp: '^shared_buffers = 128MB'
-      #           line: "shared_buffers = 1536MB                # min 128kB"
-      #           backrefs: yes
-      #         become_user: "{{ postgresql_user }}"
-      #       - name: KAFKA PRODUCER OVERLAY | configuring postgresql effective cache
-      #         lineinfile:
-      #           path: "{{ postgresql_config_path }}/postgresql.conf"
-      #           regexp: '^#effective_cache_size = 4GB'
-      #           line: "effective_cache_size = 4GB"
-      #           backrefs: yes
-      #         become_user: "{{ postgresql_user }}"
-      #       - name: KAFKA PRODUCER OVERLAY | configuring postgresql maintenance worker memory
-      #         lineinfile:
-      #           path: "{{ postgresql_config_path }}/postgresql.conf"
-      #           regexp: '^#maintenance_work_mem = 64MB'
-      #           line: "maintenance_work_mem = 384MB           # min 1MB"
-      #           backrefs: yes
-      #         become_user: "{{ postgresql_user }}"
-      #       - name: KAFKA PRODUCER OVERLAY | configuring postgresql maximum wal size
-      #         lineinfile:
-      #           path: "{{ postgresql_config_path }}/postgresql.conf"
-      #           regexp: '^#max_wal_size = 1GB'
-      #           line: "max_wal_size = 2GB"
-      #           backrefs: yes
-      #         become_user: "{{ postgresql_user }}"
-      #       - name: KAFKA PRODUCER OVERLAY | configuring postgresql minimum wal size
-      #         lineinfile:
-      #           path: "{{ postgresql_config_path }}/postgresql.conf"
-      #           regexp: '^#min_wal_size = 80MB'
-      #           line: "min_wal_size = 1GB"
-      #           backrefs: yes
-      #         become_user: "{{ postgresql_user }}"
-      #       - name: KAFKA PRODUCER OVERLAY | configuring postgresql checkpoint completion target
-      #         lineinfile:
-      #           path: "{{ postgresql_config_path }}/postgresql.conf"
-      #           regexp: '^#checkpoint_completion_target = 0.5'
-      #           line: "checkpoint_completion_target = 0.9     # checkpoint target duration, 0.0 - 1.0"
-      #           backrefs: yes
-      #         become_user: "{{ postgresql_user }}"
-      #       - name: KAFKA PRODUCER OVERLAY | configuring postgresql wal buffers
-      #         lineinfile:
-      #           path: "{{ postgresql_config_path }}/postgresql.conf"
-      #           regexp: '^#wal_buffers = -1'
-      #           line: "wal_buffers = 16MB                     # min 32kB, -1 sets based on shared_buffers"
-      #           backrefs: yes
-      #         become_user: "{{ postgresql_user }}"
-            # - name: KAFKA PRODUCER OVERLAY | configuring postgresql default statistics target
-      #         lineinfile:
-      #           path: "{{ postgresql_config_path }}/postgresql.conf"
-      #           regexp: '^#default_statistics_target = 100'
-      #           line: "default_statistics_target = 100         # range 1-10000"
-      #           backrefs: yes
-      #         become_user: "{{ postgresql_user }}"
-            # - name: KAFKA PRODUCER OVERLAY | configuring postgresql random page cost
-           #    lineinfile:
-           #      path: "{{ postgresql_config_path }}/postgresql.conf"
-           #      regexp: '^#random_page_cost = 4.0'
-           #      line: "random_page_cost = 4.0                  # same scale as above"
-           #      backrefs: yes
-           #    become_user: "{{ postgresql_user }}"
-           #  - name: KAFKA PRODUCER OVERLAY | configuring postgresql effective io concurrency
-           #    lineinfile:
-           #      path: "{{ postgresql_config_path }}/postgresql.conf"
-           #      regexp: '^#effective_io_concurrency = 1'
-           #      line: "effective_io_concurrency = 2           # 1-1000; 0 disables prefetching"
-           #      backrefs: yes
-           #    become_user: "{{ postgresql_user }}"
-           #  - name: KAFKA PRODUCER OVERLAY | configuring postgresql maximum worker processes
-           #    lineinfile:
-           #      path: "{{ postgresql_config_path }}/postgresql.conf"
-           #      regexp: '^#max_worker_processes = 8'
-           #      line: "max_worker_processes = 2               # (change requires restart)"
-           #      backrefs: yes
-           #    become_user: "{{ postgresql_user }}"
-           #  - name: KAFKA PRODUCER OVERLAY | configuring postgresql maximum parallel workers per gather
-           #    lineinfile:
-           #      path: "{{ postgresql_config_path }}/postgresql.conf"
-           #      regexp: '^#max_parallel_workers_per_gather = 0'
-           #      line: "max_parallel_workers_per_gather = 1    # taken from max_worker_processes"
-           #      backrefs: yes
-           #    become_user: "{{ postgresql_user }}"
-           #  - name: KAFKA PRODUCER OVERLAY | configuring postgresql work memory
-           #    lineinfile:
-           #      path: "{{ postgresql_config_path }}/postgresql.conf"
-           #      regexp: '^#work_mem = 4MB'
-           #      line: "work_mem = 4MB                         # min 64kB"
-           #      backrefs: yes
-           #    become_user: "{{ postgresql_user }}"
-      - name: KAFKA PRODUCER OVERLAY | restarting postgresql
-        service:
-          name: "postgresql-{{ postgresql_major_version }}.{{ postgresql_minor_version }}"
-          state: restarted
-      become: true
+    - setup:
       
 # gather_facts or setup: will mine the system for eth1, but we need to do some prep work anyway
 - name: KAFKA PRODUCER OVERLAY | discovering cassandra interfaces
@@ -426,8 +318,8 @@
       
       - command: /usr/bin/psql -c 'DELETE FROM t1;'
   
-      - name: KAFKA PRODUCER OVERLAY | inserting postgresql from 1 to 500,000 rows
-        command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(1,500000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
+      - name: KAFKA PRODUCER OVERLAY | inserting postgresql from 1 to 250,000 rows
+        command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(1,250000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
       become: true
       become_user: "{{ postgresql_user }}" 
                      
@@ -826,69 +718,146 @@
   gather_facts: yes
   tasks:
     - block:
-      - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 500,001 to 1,000,000 rows
+      - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 250,001 to 500,000 rows
         pause:
-          seconds: 40
-      - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(500001,1000000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
-      
+          seconds: 20
+      - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(250001,500000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
+      become: true
+      become_user: "{{ postgresql_user }}"
+    
+    - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 500,001 to 750,000 rows
+      pause:
+        seconds: 20
+    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(500001,750000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
+      become: true
+      become_user: "{{ postgresql_user }}"
+    
+    - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 750,001 to 1,000,000 rows
+      pause:
+        seconds: 20
+    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(750001,1000000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
+      become: true
+      become_user: "{{ postgresql_user }}"
+    
+    - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 1,000,001 to 1,250,000 rows
+      pause:
+        seconds: 20
+    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(1000001,1250000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
       become: true
       become_user: "{{ postgresql_user }}"
 
-    - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 1,000,001 to 1,500,000 rows
+    - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 1,250,001 to 1,500,000 rows
       pause:
-        seconds: 40
-    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(1000001,1500000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
+        seconds: 20
+    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(1250001,1500000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
+      become: true
+      become_user: "{{ postgresql_user }}"
+    
+    - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 1,500,001 to 1,750,000 rows
+      pause:
+        seconds: 20
+    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(1500001,1750000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
       become: true
       become_user: "{{ postgresql_user }}"
 
-    - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 1,500,001 to 2,000,000 rows
+    - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 1,750,001 to 2,000,000 rows
       pause:
-        seconds: 40
-    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(1500001,2000000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
+        seconds: 20
+    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(1750001,2000000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
       become: true
       become_user: "{{ postgresql_user }}"
 
     - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 2,000,001 to 2,500,000 rows
       pause:
-        seconds: 40
-    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(2000001,2500000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
+        seconds: 20
+    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(2000001,2250000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
       become: true
       become_user: "{{ postgresql_user }}"
 
-    - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 2,500,001 to 3,000,000 rows
+    - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 2,250,001 to 2,500,000 rows
       pause:
-        seconds: 40
-    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(2500001,3000000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
+        seconds: 20
+    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(2250001,2500000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
       become: true
       become_user: "{{ postgresql_user }}"
-
-    - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 3,000,001 to 3,500,000 rows
+      
+    - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 2,500,001 to 2,750,000 rows
       pause:
-        seconds: 40
-    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(3000001,3500000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
+        seconds: 20
+    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(2500001,2750000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
       become: true
       become_user: "{{ postgresql_user }}"
 
-    # - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 3,500,001 to 4,000,000 rows
-    #   pause:
-    #     seconds: 40
-    # - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(3500001,4000000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
-    #   become: true
-    #   become_user: "{{ postgresql_user }}"
-    #
-    # - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 4,000,001 to 4,500,000 rows
-    #   pause:
-    #     seconds: 40
-    # - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(4000001,4500000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
-    #   become: true
-    #   become_user: "{{ postgresql_user }}"
-    #
-    # - name: KAFKA PRODUCER OVERLAY | pausing before inserting 500K rows 4,500,001 to 5,000,000
-    #   pause:
-    #     seconds: 40
-    # - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(4500001,5000000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
-    #   become: true
-    #   become_user: "{{ postgresql_user }}"
+    - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 2,750,001 to 3,000,000 rows
+      pause:
+        seconds: 20
+    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(2750001,3000000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
+      become: true
+      become_user: "{{ postgresql_user }}"
+      
+    - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 3,000,001 to 3,250,000 rows
+      pause:
+        seconds: 20
+    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(3000001,3250000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
+      become: true
+      become_user: "{{ postgresql_user }}"
+    
+    - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 3,250,001 to 3,500,000 rows
+      pause:
+        seconds: 20
+    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(3250001,3500000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
+      become: true
+      become_user: "{{ postgresql_user }}"
+
+    - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 3,500,001 to 3,750,000 rows
+      pause:
+        seconds: 20
+    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(3500001,3750000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
+      become: true
+      become_user: "{{ postgresql_user }}"
+      
+    - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 3,750,001 to 4,000,000 rows
+      pause:
+        seconds: 20
+    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(3750001,4000000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
+      become: true
+      become_user: "{{ postgresql_user }}"
+    
+    - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 4,000,001 to 4,250,000 rows
+      pause:
+        seconds: 20
+    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(4000001,4250000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
+      become: true
+      become_user: "{{ postgresql_user }}"
+    
+    - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 4,250,001 to 4,500,000 rows
+      pause:
+        seconds: 20
+    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(4250001,4500000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
+      become: true
+      become_user: "{{ postgresql_user }}"
+    
+    - name: KAFKA PRODUCER OVERLAY | pausing before inserting 500K rows 4,500,001 to 4,750,000
+      pause:
+        seconds: 20
+    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(4500001,4750000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
+      become: true
+      become_user: "{{ postgresql_user }}"
+    
+    - name: KAFKA PRODUCER OVERLAY | pausing before inserting 500K rows 4,750,001 to 5,000,000
+      pause:
+        seconds: 20
+    - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(4750001,5000000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
+      become: true
+      become_user: "{{ postgresql_user }}"
+    
+    # - name: KAFKA PRODUCER OVERLAY | pausing before inserting 500K rows 5,000,001 to 5,250,000
+   #    pause:
+   #      seconds: 20
+   #  - command: /usr/bin/psql -c "INSERT INTO t1 VALUES (generate_series(5000001,5250000), now(), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text), md5(random()::text));"
+   #    become: true
+   #    become_user: "{{ postgresql_user }}"
+      
     #
     # - name: KAFKA PRODUCER OVERLAY | pausing before inserting from 5,000,001 to 5,500,000 rows
     #   pause:

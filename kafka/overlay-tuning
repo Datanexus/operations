@@ -1,0 +1,69 @@
+#!/usr/bin/env ansible-playbook
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# basic tuning settings for kafka
+#
+
+# AWS_PROFILE=datanexus ./overlay-tuning -e "cloud=aws region=us-east-2 application=kafka domain=development project=demo tenant=datanexus key_path=/Users/christopher/Documents/DataNexus/Demos/us-east-2  ansible_user=centos tenant_config_path=/Users/christopher/Documents/DataNexus/Platform/Source/datanexus application_path=/Users/christopher/Documents/DataNexus/Platform/Source/kafka"
+
+- name: KAFKA TUNING OVERLAY | discovering all kafka instances
+  hosts: localhost
+  tasks:
+    - block:
+      - ec2_instance_facts:
+          region: "{{ region }}"
+          filters:
+            instance-state-name: running
+            "tag:Domain": "{{ domain }}"
+            "tag:Application": kafka
+            "tag:Project": "{{ project }}"
+            "tag:Tenant": "{{ tenant }}"
+        register: kafka_instances
+      
+      - name: KAFKA TUNING OVERLAY | building kafka source host group
+        add_host: hostname="{{ item }}" groupname=kafka ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-kafka-{{ domain }}-private-key.pem"
+        with_items: "{{ kafka_instances.instances | map(attribute='private_ip_address') | list }}"
+        when:
+          - kafka_instances is defined
+          - kafka_instances.instances | length > 0
+      when:
+        - cloud == 'aws'
+
+- name: KAFKA TUNING OVERLAY | tuning all kafka instances
+  hosts: postgresql
+  vars_files:
+    - "{{ application_path }}/vars/kafka.yml"
+  gather_facts: yes
+  tasks:
+#    - debug: msg="{{  hostvars[inventory_hostname].ansible_processor_vcpus }}"
+    
+    - block:
+           # based 546byte message size
+           # - name: DATANEXUS DEMO OVERLAY | tuning bytes sent
+          #    lineinfile:
+          #      state: present
+          #      path: /etc/kafka/connect-distributed.properties
+          #      regexp: '^consumer.fetch.min.bytes=550000'
+          #      line: 'consumer.fetch.min.bytes=550000'
+          
+           # - name: DATANEXUS DEMO OVERLAY | tuning wait interval
+      #        lineinfile:
+      #          state: present
+      #          path: /etc/kafka/connect-distributed.properties
+      #          regexp: '^consumer.fetch.wait.max.ms=1000'
+      #          line: 'consumer.fetch.wait.max.ms=1000'
+      
+           # - name: DATANEXUS DEMO OVERLAY | tuning wait interval for avro distributed connector
+          #    lineinfile:
+          #      state: present
+          #      path: /etc/schema-registry/connect-avro-distributed.properties
+          #      regexp: '^consumer.fetch.wait.max.ms=1000'
+          #      line: 'consumer.fetch.wait.max.ms=1000'
+          
+    
+      # - name: KAFKA TUNING OVERLAY | restarting kafka
+     #    service:
+     #      name: kafka
+     #      state: restarted
+          
+      become: true

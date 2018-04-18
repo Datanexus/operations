@@ -1,0 +1,339 @@
+#!/usr/bin/env ansible-playbook
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# overlay broker-to-broker, client-to-broker encryption over top of an existing kafka cluster
+
+# AWS_PROFILE=datanexus ./install-utilities -e "cloud=aws region=us-east-2 domain=development project=demo tenant=datanexus key_path=/Users/christopher/Documents/DataNexus/Demos/us-east-2  ansible_user=centos tenant_config_path=/Users/christopher/Documents/DataNexus/Platform/Source/datanexus source_home=/Users/christopher/Documents/DataNexus/Platform/Source"
+---     
+- name: DATANEXUS DEMO OVERLAY | discovering all zookeeper nodes
+  hosts: localhost
+  tasks:
+    - block:
+      - ec2_remote_facts:
+          region: "{{ region }}"
+          filters:
+            instance-state-name: running
+            "tag:Application": zookeeper
+            "tag:Domain": "{{ domain }}"
+            "tag:Project": "{{ project }}"
+            "tag:Tenant": "{{ tenant }}"
+        register: zookeeper_instances
+        when:
+          - cloud == 'aws'
+
+      - name: DATANEXUS DEMO OVERLAY | building zookeeper host group
+        add_host: hostname="{{ item }}" groupname="zookeeper" ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-zookeeper-{{ domain }}-private-key.pem"
+        with_items: "{{ zookeeper_instances.instances | map(attribute='private_ip_address') | list }}"
+        when:
+          - zookeeper_instances.instances|length > 0
+      when:
+        - cloud == 'aws'
+
+- name: DATANEXUS DEMO OVERLAY | discovering all cassandra nodes
+  hosts: localhost
+  tasks:
+    - block:
+      - ec2_remote_facts:
+          region: "{{ region }}"
+          filters:
+            instance-state-name: running
+            "tag:Application": cassandra
+            "tag:Domain": "{{ domain }}"
+            "tag:Project": "{{ project }}"
+            "tag:Tenant": "{{ tenant }}"
+            "tag:Cluster": "{{ cluster | default ('a') }}"
+        register: cassandra_instances
+        when:
+          - cloud == 'aws'
+
+      - name: DATANEXUS DEMO OVERLAY | building cassandra host group
+        add_host: hostname="{{ item }}" groupname="cassandra" ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-cassandra-{{ domain }}-private-key.pem"
+        with_items: "{{ cassandra_instances.instances | map(attribute='private_ip_address') | list }}"
+        when:
+          - cassandra_instances.instances|length > 0
+      when:
+        - cloud == 'aws'
+
+# gather_facts or setup: will mine the system for eth1, but we need to do some prep work anyway
+- name: DATANEXUS DEMO OVERLAY | discovering cassandra interfaces
+  hosts: cassandra
+  vars_files:
+    - "{{ source_home }}/cassandra/vars/cassandra.yml"
+  tasks:
+    - setup:
+      
+- name: DATANEXUS DEMO OVERLAY | building cassandra interface list
+  hosts: localhost
+  tasks:
+    - name: DATANEXUS DEMO OVERLAY | building cassandra public internal host group
+      add_host: hostname="{{ hostvars[item].ansible_eth1.ipv4.address }}" groupname=cassandra_public ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-cassandra-{{ domain }}-private-key.pem"
+      with_items: "{{ groups['cassandra'] }}"
+      run_once: true
+      
+- name: DATANEXUS DEMO OVERLAY | discovering all postgresql instances
+  hosts: localhost
+  tasks:
+    - block:
+      - ec2_instance_facts:
+          region: "{{ region }}"
+          filters:
+            instance-state-name: running
+            "tag:Domain": "{{ domain }}"
+            "tag:Application": postgresql
+            "tag:Project": "{{ project }}"
+            "tag:Tenant": "{{ tenant }}"
+#            "tag:Dataflow": "{{ dataflow | default ('none') }}"
+        register: postgresql_instances
+      
+      - name: DATANEXUS DEMO OVERLAY | building postgresql source host group
+        add_host: hostname="{{ item }}" groupname=postgresql ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
+        with_items: "{{ postgresql_instances.instances | map(attribute='private_ip_address') | list }}"
+        when:
+          - postgresql_instances is defined
+          - postgresql_instances.instances | length > 0
+      when:
+        - cloud == 'aws'
+        
+- name: DATANEXUS DEMO OVERLAY | discovering postgresql source instance
+  hosts: localhost
+  tasks:
+    - block:
+      - ec2_instance_facts:
+          region: "{{ region }}"
+          filters:
+            instance-state-name: running
+            "tag:Domain": "{{ domain }}"
+            "tag:Application": postgresql
+            "tag:Project": "{{ project }}"
+            "tag:Tenant": "{{ tenant }}"
+            "tag:Cluster": "{{ cluster | default ('a') }}"
+#            "tag:Dataflow": "{{ dataflow | default ('none') }}"
+        register: postgresql_instances
+      
+      - name: DATANEXUS DEMO OVERLAY | building postgresql source host group
+        add_host: hostname="{{ item }}" groupname=postgresql_source ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
+        with_items: "{{ postgresql_instances.instances | map(attribute='private_ip_address') | list }}"
+        when:
+          - postgresql_instances is defined
+          - postgresql_instances.instances | length > 0
+      when:
+        - cloud == 'aws'
+        
+- name: DATANEXUS DEMO OVERLAY | discovering postgresql sink instance
+  hosts: localhost
+  tasks:
+    - block:
+      - ec2_instance_facts:
+          region: "{{ region }}"
+          filters:
+            instance-state-name: running
+            "tag:Domain": "{{ domain }}"
+            "tag:Application": postgresql
+            "tag:Project": "{{ project }}"
+            "tag:Tenant": "{{ tenant }}"
+            "tag:Cluster": "{{ cluster | default ('b') }}"
+#            "tag:Dataflow": "{{ dataflow | default ('none') }}"
+        register: postgresql_instances
+      
+      - name: DATANEXUS DEMO OVERLAY | building postgresql sink host group
+        add_host: hostname="{{ item }}" groupname=postgresql_sink ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
+        with_items: "{{ postgresql_instances.instances | map(attribute='private_ip_address') | list }}"
+        when:
+          - postgresql_instances is defined
+          - postgresql_instances.instances | length > 0
+      when:
+        - cloud == 'aws'
+
+- name: DATANEXUS DEMO OVERLAY | registering postgresql sink interfaces and cleaning demo destination tables
+  hosts: postgresql_sink
+  vars_files:
+    - "{{ source_home }}/postgresql/vars/postgresql.yml"
+  gather_facts: yes
+  tasks:
+    - setup:
+              
+- name: DATANEXUS DEMO OVERLAY | discovering all kafka nodes
+  hosts: localhost
+  tasks:
+    - block:
+      - ec2_remote_facts:
+          region: "{{ region }}"
+          filters:
+            instance-state-name: running
+            "tag:Application": kafka
+            "tag:Domain": "{{ domain }}"
+            "tag:Project": "{{ project }}"
+            "tag:Tenant": "{{ tenant }}"
+        register: kafka_instances
+        when:
+          - cloud == 'aws'
+
+      - name: DATANEXUS DEMO OVERLAY | building kafka host group
+        add_host: hostname="{{ item }}" groupname=kafka ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-kafka-{{ domain }}-private-key.pem"
+        with_items: "{{ kafka_instances.instances|map(attribute='private_ip_address')|list }}"
+        when:
+          - kafka_instances.instances|length > 0
+      when:
+        - cloud == 'aws'
+
+# there has to be a better way to gather the eth1 IP address; wtb cloud agnostic inventory system
+- name: DATANEXUS DEMO OVERLAY | discovering kafka interfaces
+  hosts: kafka
+  vars_files:
+    - "{{ source_home }}/kafka/vars/kafka.yml"
+  tasks:
+    - setup:
+           
+- name: DATANEXUS DEMO OVERLAY | building {{ application }} interface list
+  hosts: localhost
+  tasks:
+    - name: DATANEXUS DEMO OVERLAY | building kafka public internal host group
+      add_host: hostname="{{ hostvars[item].ansible_eth1.ipv4.address }}" groupname=kafka_public ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-kafka-{{ domain }}-private-key.pem"
+      with_items: "{{ groups['kafka'] }}"
+        
+# there has to be a better way to gather the eth1 IP address; wtb cloud agnostic inventory system
+- name: DATANEXUS DEMO OVERLAY | discovering postgresql interfaces
+  hosts: postgresql
+  vars_files:
+    - "{{ source_home }}/postgresql/vars/postgresql.yml"
+  tasks:
+    - setup:
+    
+- name: DATANEXUS DEMO OVERLAY | configuring kafka certificates and stores
+  hosts: kafka
+  vars_files:
+      - "{{ source_home }}/kafka/vars/kafka.yml"
+      - "{{ source_home }}/postgresql/vars/postgresql.yml"
+      - "{{ tenant_config_path }}/config/site.yml"
+  gather_facts: true
+  tasks:
+    - set_fact: store_password=datanexus
+    
+    - name: DATANEXUS DEMO OVERLAY | installing kafka topic list utility
+      template:
+        src: list-topics.sh.j2
+        dest: /usr/local/bin/list-topics.sh
+        mode: 0755
+        owner: "{{ kafka_user }}"
+        group: "{{ kafka_group }}"
+      become: true
+      
+    - name: DATANEXUS DEMO OVERLAY | installing kafka topic describe utility
+      template:
+        src: describe-topic.sh.j2
+        dest: /usr/local/bin/describe-topic.sh
+        mode: 0755
+        owner: "{{ kafka_user }}"
+        group: "{{ kafka_group }}"
+      become: true
+      
+    - name: DATANEXUS DEMO OVERLAY | installing kafka connector topics create utility
+      template:
+        src: create-connector-topics.sh.j2
+        dest: /usr/local/bin/create-connector-topics.sh
+        mode: 0755
+        owner: "{{ kafka_user }}"
+        group: "{{ kafka_group }}"
+      become: true
+    
+    - name: DATANEXUS DEMO OVERLAY | installing kafka data topic create utility
+      template:
+        src: create-data-topic.sh.j2
+        dest: /usr/local/bin/create-data-topic.sh
+        mode: 0755
+        owner: "{{ kafka_user }}"
+        group: "{{ kafka_group }}"
+      become: true
+      
+    - name: DATANEXUS DEMO OVERLAY | installing kafka connector list utility
+      template:
+        src: list-connectors.sh.j2
+        dest: /usr/local/bin/list-connectors.sh
+        mode: 0755
+        owner: "{{ kafka_user }}"
+        group: "{{ kafka_group }}"
+      become: true
+      
+    - name: DATANEXUS DEMO OVERLAY | installing kafka topic display utility
+      template:
+        src: cat-topic.sh.j2
+        dest: /usr/local/bin/cat-topic.sh
+        mode: 0755
+        owner: "{{ kafka_user }}"
+        group: "{{ kafka_group }}"
+      become: true
+    
+    - name: DATANEXUS DEMO OVERLAY | installing kafka connector deletion utility
+      template:
+        src: delete-connector.sh.j2
+        dest: /usr/local/bin/delete-connector.sh
+        mode: 0755
+        owner: "{{ kafka_user }}"
+        group: "{{ kafka_group }}"
+      become: true
+    
+    - name: DATANEXUS DEMO OVERLAY | installing kafka consumer group describe utility
+      template:
+        src: describe-group.sh.j2
+        dest: /usr/local/bin/describe-group.sh
+        mode: 0755
+        owner: "{{ kafka_user }}"
+        group: "{{ kafka_group }}"
+      become: true
+      
+    - name: DATANEXUS DEMO OVERLAY | installing distributed connector start template
+      template:
+        src: distributed-connector.sh.j2
+        dest: /usr/local/bin/distributed-connector.sh
+        mode: 0755
+        owner: "{{ kafka_user }}"
+        group: "{{ kafka_group }}"
+      become: true
+    
+    - name: DATANEXUS DEMO OVERLAY | installing avro distributed connector start template
+      template:
+        src: avro-distributed-connector.sh.j2
+        dest: /usr/local/bin/avro-distributed-connector.sh
+        mode: 0755
+        owner: "{{ kafka_user }}"
+        group: "{{ kafka_group }}"
+      become: true
+    
+    
+    - name: DATANEXUS DEMO OVERLAY | installing optional ssl configuration for CLI consumers
+      template:
+        src: ssl.properties.j2
+        dest: /etc/kafka/ssl.properties
+        mode: 0755
+        owner: "{{ kafka_user }}"
+        group: "{{ kafka_group }}"
+      become: true
+      
+      # - name: DATANEXUS DEMO OVERLAY | installing kafka topic deletion utility
+      #   template:
+      #     src: delete-topics.sh.j2
+      #     dest: /usr/local/bin/delete-topics.sh
+      #     mode: 0755
+      #     owner: "{{ kafka_user }}"
+      #     group: "{{ kafka_group }}"
+      #
+      # - name: DATANEXUS DEMO OVERLAY | installing kafka connector stop utility
+      #   template:
+      #     src: stop-connector.sh.j2
+      #     dest: /usr/local/bin/stop-connector.sh
+      #     mode: 0755
+      #     owner: "{{ kafka_user }}"
+      #     group: "{{ kafka_group }}"
+  
+      # - name: DATANEXUS DEMO OVERLAY | stopping the connector on all nodes
+      #   shell: /usr/local/bin/stop-connector.sh
+      #
+      # - name: DATANEXUS DEMO OVERLAY | removing specified topics on a single node
+      #   shell: /usr/local/bin/delete-topics.sh postgres_t1 cassandra_t2
+      #   run_once: true
+      #
+      # - name: DATANEXUS DEMO OVERLAY | restarting kafka (it's the only way to be sure)
+      #   service:
+      #     name: kafka
+      #     state: restarted
+      #

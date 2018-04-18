@@ -1,7 +1,0 @@
-#!/bin/sh
-# (c) Copyright 2016 DataNexus Inc.  All Rights Reserved.
-
-/usr/local/bin/list-connectors.sh | /usr/bin/grep cassandra-t2-source &> /dev/null
-if [ $? != 0 ]; then
-  echo '{"name":"cassandra-t2-source", "config":{"connector.class":"com.datamountaineer.streamreactor.connect.cassandra.source.CassandraSourceConnector","connect.cassandra.kcql":"INSERT INTO cassandra_t2 SELECT * FROM t2 PK created INCREMENTALMODE=TIMEUUID","connect.cassandra.port":"9042","connect.cassandra.key.space":"demo","connect.cassandra.consistency.level":"ONE","connect.cassandra.contact.points":"{{ groups['cassandra_public'] | join(',') }}","connect.cassandra.username":"cassandra","connect.cassandra.password":"cassandra","tasks.max":"1"}}' | curl -X POST -d @- http://{{ hostvars[inventory_hostname].ansible_eth0.ipv4.address }}:8083/connectors --header "Content-Type: application/json"
-fi

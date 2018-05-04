@@ -2,23 +2,23 @@
 # (c) Copyright 2016 DataNexus Inc.  All Rights Reserved. 
 # postgresql deployment wrapper
 
-export application=$1   #  overlay to deploy
-: ${AWS_PROFILE:=datanexus} && export AWS_PROFILE=$AWS_PROFILE    # sets this to a reasonable ~/.aws/credentials default
+export application="$1"   #  overlay to deploy
+: "${AWS_PROFILE:=datanexus}" && export AWS_PROFILE="$AWS_PROFILE"    # sets this to a reasonable ~/.aws/credentials default
 
-if [ $# -eq 0 ] || [ "$1" == "-h" ] ; then
-    echo "Usage:   `basename $0` [-h]\thelp"
-    echo "\t `basename $0` [FILE | TENANT PROJECT CLOUD REGION DOMAIN CLUSTER SSH_USER POSTGRESQL_USER TENANT_PATH KEY_PATH APPLICATION_PATH]\tdeploy $application overlay with FILE configuration or with the specified values"
-    echo "Example: `basename $0` encryption datanexus demo aws us-east-1 development a centos postgres /tmp/datanexus /tmp /tmp/postgresql"
-    echo "\t `basename $0` /tmp/configuration.yml"
+if [ $# -eq 0 ] || [ "$1" = "-h" ] ; then
+    printf "Usage:   deploy [-h]\\thelp"
+    printf "\\t deploy [FILE | TENANT PROJECT CLOUD REGION DOMAIN CLUSTER SSH_USER POSTGRESQL_USER TENANT_PATH KEY_PATH APPLICATION_PATH]\\tdeploy %s overlay with FILE configuration or with the specified values" "$application"
+    printf "Example: deploy encryption datanexus demo aws us-east-1 development a centos postgres /tmp/datanexus /tmp /tmp/postgresql\\n"
+    printf "\\t deploy /tmp/configuration.yml\\n"
     exit 0
 fi
 
 # likely called by the orchestrator to just pass through everything
-if [ $# -eq 3 ] && [ "$2" == "-e" ]; then
-  ./overlay-"$application" $2 "$3"
+if [ $# -eq 3 ] && [ "$2" = "-e" ]; then
+  ./overlay-"$application" "$2" "$3"
 
 # deploy postgresql as an overlay without the orchestrator
-elif [ $# -eq 12 ] && [ -d ${12} ]; then
+elif [ $# -eq 12 ] && [ -d "${12}" ]; then
   ./overlay-"$application" -e "tenant=$2 project=$3 cloud=$4 region=$5 domain=$6 cluster=$7 user=$8 postgresql_user=$9 tenant_config_path=${10} key_path=${11} application_path=${12}"
 # elif [ $# -eq 1 ] && [ -f $1 ] && [ -s $1 ]; then
 #   ./provision-postgresql --tags "vm,$application" -e "configuration=$1"

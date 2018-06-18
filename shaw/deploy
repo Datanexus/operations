@@ -1,0 +1,26 @@
+#!/usr/bin/env sh
+# (c) Copyright 2016 DataNexus Inc.  All Rights Reserved. 
+# shaw overlay wrapper
+
+export application="$1"   #  overlay to deploy
+: "${AWS_PROFILE:=datanexus}" && export AWS_PROFILE="$AWS_PROFILE"    # sets this to a reasonable ~/.aws/credentials default
+: "${AZURE_PROFILE:=datanexus}" && export AZURE_PROFILE="$AZURE_PROFILE"    # sets this to a reasonable ~/.azure/credentials default
+
+if [ $# -eq 0 ] || [ "$1" = "-h" ] ; then
+    printf "Usage:   deploy [-h]\\thelp\\n"
+    printf "\\t deploy [FILE | TENANT PROJECT CLOUD REGION DOMAIN CLUSTER SSH_USER KAFKA_USER TENANT_PATH KEY_PATH APPLICATION_PATH]\\tdeploy %s overlay with FILE configuration or with the specified values\\n" "$application"
+    printf "Example: deploy encryption datanexus demo aws us-east-1 development a centos kafka /tmp/datanexus /tmp /tmp/postgresql\\n"
+    printf "\\t deploy /tmp/configuration.yml\\n"
+    exit 0
+fi
+
+# likely called by the orchestrator to just pass through everything
+if [ $# -eq 3 ] && [ "$2" = "-e" ]; then
+  ./overlay-"$application" "$2" "$3"
+
+# deploy sshd security overlay without the orchestrator
+elif [ $# -eq 8 ] && [ -d "${8}" ]; then
+  ./overlay-"$application" -e "tenant=${2} project=${3} cloud=${4} region=${5} domain=${6} user=${7} key_path=${8}"
+# elif [ $# -eq 1 ] && [ -f "$1" ] && [ -s "$1" ]; then
+#   ./provision-postgresql --tags "vm,$application" -e "configuration=$1"
+fi

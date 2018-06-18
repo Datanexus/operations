@@ -1,0 +1,177 @@
+#!/usr/bin/env ansible-playbook
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# overlay ssh certificates
+# ./deploy ssh-certificates datanexus demo aws us-east-1 development centos /Users/christopher/Documents/DataNexus/Demos/us-east-1
+---     
+- name: SSH CERTIFICATE OVERLAY | discovering all {{ project }} {{ domain }} cluster nodes
+  hosts: localhost
+  tasks:
+    
+    - block:
+      
+      - name: SSH CERTIFICATE OVERLAY | discovering all jumphosts
+        ec2_instance_facts:
+          region: "{{ region }}"
+          filters:
+            instance-state-name: running
+            "tag:Application": jumphost
+            "tag:Domain": "{{ domain }}"
+            "tag:Project": "{{ project }}"
+            "tag:Tenant": "{{ tenant }}"
+        register: jumphost_instances
+    
+      - name: SSH CERTIFICATE OVERLAY | discovering shaw
+        ec2_instance_facts:
+          region: "{{ region }}"
+          filters:
+            instance-state-name: running
+            "tag:Application": shaw
+            "tag:Domain": "{{ domain }}"
+            "tag:Project": "{{ project }}"
+            "tag:Tenant": "{{ tenant }}"
+        register: shaw_instances
+    
+      - name: SSH CERTIFICATE OVERLAY | discovering dorland
+        ec2_instance_facts:
+          region: "{{ region }}"
+          filters:
+            instance-state-name: running
+            "tag:Application": dorland
+            "tag:Domain": "{{ domain }}"
+            "tag:Project": "{{ project }}"
+            "tag:Tenant": "{{ tenant }}"
+        register: dorland_instances
+    
+      - name: SSH CERTIFICATE OVERLAY | discovering all postgresql
+        ec2_instance_facts:
+          region: "{{ region }}"
+          filters:
+            instance-state-name: running
+            "tag:Application": postgresql
+            "tag:Domain": "{{ domain }}"
+            "tag:Project": "{{ project }}"
+            "tag:Tenant": "{{ tenant }}"
+        register: postgresql_instances
+      
+      - name: SSH CERTIFICATE OVERLAY | discovering all cassandra
+        ec2_instance_facts:
+          region: "{{ region }}"
+          filters:
+            instance-state-name: running
+            "tag:Application": cassandra
+            "tag:Domain": "{{ domain }}"
+            "tag:Project": "{{ project }}"
+            "tag:Tenant": "{{ tenant }}"
+        register: cassandra_instances
+        
+      - name: SSH CERTIFICATE OVERLAY | discovering all zookeeper
+        ec2_instance_facts:
+          region: "{{ region }}"
+          filters:
+            instance-state-name: running
+            "tag:Application": zookeeper
+            "tag:Domain": "{{ domain }}"
+            "tag:Project": "{{ project }}"
+            "tag:Tenant": "{{ tenant }}"
+        register: zookeeper_instances
+      
+      - name: SSH CERTIFICATE OVERLAY | discovering all kafka
+        ec2_instance_facts:
+          region: "{{ region }}"
+          filters:
+            instance-state-name: running
+            "tag:Application": kafka
+            "tag:Domain": "{{ domain }}"
+            "tag:Project": "{{ project }}"
+            "tag:Tenant": "{{ tenant }}"
+        register: kafka_instances
+        
+      when:
+        - cloud == 'aws'
+    
+    # we explicitly state the user here because the ssh/config handles every other instance
+    - name: SSH CERTIFICATE OVERLAY | adding jumphosts to platform host group
+      add_host: hostname="{{ item }}" groupname=platform ansible_user="{{ user }}" ansible_ssh_private_key_file="{{ key_path | default(playbook_dir) }}/{{ cloud }}-{{ region }}-{{ project }}-jumphost-{{ domain }}-private-key.pem"
+      with_items: "{{ jumphost_instances.instances | map(attribute='public_ip_address') | list }}"      
+      when: jumphost_instances.instances | length > 0
+    
+    - name: SSH CERTIFICATE OVERLAY | adding shaw to platform host group
+      add_host: hostname="{{ item }}" groupname=platform ansible_ssh_private_key_file="{{ key_path | default(playbook_dir) }}/{{ cloud }}-{{ region }}-{{ project }}-shaw-{{ domain }}-private-key.pem"
+      with_items: "{{ shaw_instances.instances | map(attribute='private_ip_address') | list }}"
+      when: shaw_instances.instances | length > 0
+      
+    - name: SSH CERTIFICATE OVERLAY | adding shaw to shaw host group
+      add_host: hostname="{{ item }}" groupname=shaw ansible_ssh_private_key_file="{{ key_path | default(playbook_dir) }}/{{ cloud }}-{{ region }}-{{ project }}-shaw-{{ domain }}-private-key.pem"
+      with_items:
+        - "{{ shaw_instances.instances | map(attribute='private_ip_address') | list }}"
+        
+    - name: SSH CERTIFICATE OVERLAY | adding dorland to platform host group
+      add_host: hostname="{{ item }}" groupname=platform ansible_ssh_private_key_file="{{ key_path | default(playbook_dir) }}/{{ cloud }}-{{ region }}-{{ project }}-dorland-{{ domain }}-private-key.pem"
+      with_items: "{{ dorland_instances.instances | map(attribute='private_ip_address') | list }}"
+      when: dorland_instances.instances | length > 0
+    
+    - name: SSH CERTIFICATE OVERLAY | adding postresql to platform host group
+      add_host: hostname="{{ item }}" groupname=platform ansible_ssh_private_key_file="{{ key_path | default(playbook_dir) }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
+      with_items: "{{ postgresql_instances.instances | map(attribute='private_ip_address') | list }}"
+      when: postgresql_instances.instances | length > 0
+    
+    - name: SSH CERTIFICATE OVERLAY | adding cassandra to platform host group
+      add_host: hostname="{{ item }}" groupname=platform ansible_ssh_private_key_file="{{ key_path | default(playbook_dir) }}/{{ cloud }}-{{ region }}-{{ project }}-cassandra-{{ domain }}-private-key.pem"
+      with_items: "{{ cassandra_instances.instances | map(attribute='private_ip_address') | list }}"
+      when: cassandra_instances.instances | length > 0
+    
+    - name: SSH CERTIFICATE OVERLAY | adding zookeeper to platform host group
+      add_host: hostname="{{ item }}" groupname=platform ansible_ssh_private_key_file="{{ key_path | default(playbook_dir) }}/{{ cloud }}-{{ region }}-{{ project }}-zookeeper-{{ domain }}-private-key.pem"
+      with_items: "{{ zookeeper_instances.instances | map(attribute='private_ip_address') | list }}"
+      when: zookeeper_instances.instances | length > 0
+    
+    - name: SSH CERTIFICATE OVERLAY | adding kafka to platform host group
+      add_host: hostname="{{ item }}" groupname=platform ansible_ssh_private_key_file="{{ key_path | default(playbook_dir) }}/{{ cloud }}-{{ region }}-{{ project }}-kafka-{{ domain }}-private-key.pem"
+      with_items: "{{ kafka_instances.instances | map(attribute='private_ip_address') | list }}"
+      when: kafka_instances.instances | length > 0
+
+- name: SSH CERTIFICATE OVERLAY | downloading {{ tenant }} public CA key
+  hosts: shaw
+  gather_facts: yes
+  tasks:
+    - name: SSH CERTIFICATE OVERLAY | fetching {{ tenant }} public CA key
+      fetch:
+        src: "/etc/tls/{{ tenant }}/ca/ca-key.pub"
+        dest: "{{ key_path | default(playbook_dir) }}/ca-key.pub"
+        flat: yes
+      become: true 
+      
+- name: SSH CERTIFICATE OVERLAY | uploading {{ tenant }} public CA key and configuring trust
+  hosts: platform
+  gather_facts: yes
+  tasks:
+    - block:
+      - name: SSH CERTIFICATE OVERLAY  | creating certificate authority directory
+        file:
+         path: "/etc/tls/{{ tenant }}/ca"
+         state: directory
+         owner: root
+         group: root
+         mode: 0700
+           
+      - name: SSH CERTIFICATE OVERLAY | distributing CA public key to all cluster nodes
+        copy:
+          src:  "{{ item }}"
+          dest: "/etc/tls/{{ tenant }}/ca"
+          owner: root
+          group: root
+          mode: 0644
+        with_items:
+          - "{{  key_path | default(playbook_dir) }}/ca-key.pub"
+          
+      - name: SSH CERTIFICATE OVERLAY | configuring {{ tenant }} trusted certificate authority
+        lineinfile:
+          state: present
+          dest: /etc/ssh/sshd_config
+          line: "TrustedUserCAKeys /etc/tls/{{ tenant }}/ca/ca-key.pub"
+
+      - name: SSH CERTIFICATE OVERLAY | restarting sshd
+        systemd: name=sshd state=restarted daemon_reload=yes
+
+      become: true 

@@ -1,0 +1,93 @@
+#!/usr/bin/env ansible-playbook
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# overlay ssh certificates
+# ./deploy ssh-certificates datanexus demo aws us-east-1 development centos /Users/christopher/Documents/DataNexus/Demos/us-east-1
+---     
+- name: SSH CERTIFICATE OVERLAY | discovering all {{ project }} {{ domain }} cluster nodes
+  hosts: localhost
+  tasks:   
+    - name: SSH CERTIFICATE OVERLAY | discovering shaw
+      ec2_instance_facts:
+        region: "{{ region }}"
+        filters:
+          instance-state-name: running
+          "tag:Application": shaw
+          "tag:Domain": "{{ domain }}"
+          "tag:Project": "{{ project }}"
+          "tag:Tenant": "{{ tenant }}"
+      register: shaw_instances
+      when:
+        - cloud == 'aws'
+      
+    - name: SSH CERTIFICATE OVERLAY | adding shaw to shaw host group
+      add_host: hostname="{{ item }}" groupname=shaw ansible_ssh_private_key_file="{{ key_path | default(playbook_dir) }}/{{ cloud }}-{{ region }}-{{ project }}-shaw-{{ domain }}-private-key.pem"
+      with_items:
+        - "{{ shaw_instances.instances | map(attribute='private_ip_address') | list }}"
+
+- name: SSH CERTIFICATE OVERLAY | downloading {{ tenant }} public CA key
+  hosts: shaw
+  gather_facts: yes
+  tasks:
+    - set_fact:
+        key_user: "{{ platform_user | default(lookup('env','USER')) }}"
+        
+    - name: SSH CERTIFICATE OVERLAY | generating keypair for {{ key_user }}
+      local_action: shell echo 'y\n' | /usr/bin/ssh-keygen -t rsa -b 2048 -f {{ key_path | default(playbook_dir) }}/{{ key_user }} -q -N ""
+
+    - name: SSH CERTIFICATE OVERLAY | ensuring permissions for {{ key_path | default(playbook_dir) }}/{{ key_user }}
+      local_action: file path="{{ key_path | default(playbook_dir) }}/{{ item }}" mode=0600
+      with_items:
+        - "{{ key_user }}"
+        - "{{ key_user }}.pub"
+
+    - name: SHAW OVERLAY | uploading public key
+      copy:
+        src: "{{ key_path | default(playbook_dir) }}/{{ key_user }}.pub"
+        dest: "/tmp/{{ key_user }}.pub"
+        mode: 0600 
+      
+    - name: SSH CERTIFICATE OVERLAY | signing {{ key_user }} public key
+      command: /usr/bin/ssh-keygen -s /etc/tls/{{ tenant }}/ca/ca-key.pem -I {{ key_user }} -n centos -V +1w -z 1 /tmp/{{ key_user}}.pub
+      become: yes
+    
+    - fetch:
+        src: "/tmp/{{ key_user }}-cert.pub"
+        dest: "{{ key_path | default(playbook_dir) }}/"
+        mode: 0600
+        flat: yes
+      become: yes
+      
+# - name: SSH CERTIFICATE OVERLAY | uploading {{ tenant }} public CA key and configuring trust
+#   hosts: platform
+#   gather_facts: yes
+#   tasks:
+#     - block:
+#       - name: SSH CERTIFICATE OVERLAY  | creating certificate authority directory
+#         file:
+#          path: "/etc/tls/{{ tenant }}/ca"
+#          state: directory
+#          owner: root
+#          group: root
+#          mode: 0700
+#
+#       - name: SSH CERTIFICATE OVERLAY | distributing CA public key to all cluster nodes
+#         copy:
+#           src:  "{{ item }}"
+#           dest: "/etc/tls/{{ tenant }}/ca"
+#           owner: root
+#           group: root
+#           mode: 0644
+#         with_items:
+#           - "{{  key_path | default(playbook_dir) }}/ca-key.pub"
+#
+#       - name: SSH CERTIFICATE OVERLAY | configuring {{ tenant }} trusted certificate authority
+#         lineinfile:
+#           state: present
+#           dest: /etc/ssh/sshd_config
+#           line: "TrustedUserCAKeys /etc/tls/{{ tenant }}/ca/ca-key.pub"
+#
+#       - name: SSH CERTIFICATE OVERLAY | restarting sshd
+#         systemd: name=sshd state=restarted daemon_reload=yes
+#
+#       become: true

@@ -22,7 +22,7 @@
         register: postgresql_instances
       
       - name: POSTGRESQL TUNING OVERLAY | building postgresql source host group
-        add_host: hostname="{{ item }}" groupname=postgresql ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
+        add_host: hostname="{{ item }}" groupname=postgresql ansible_user="{{ user }}" ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
         with_items: "{{ postgresql_instances.instances | map(attribute='private_ip_address') | list }}"
         when:
           - postgresql_instances is defined
@@ -70,8 +70,27 @@
           line: "effective_cache_size = 3GB"
           backrefs: yes
         become_user: "{{ postgresql_user }}"
-      
-      - name: POSTGRESQL TUNING OVERLAY | configuring postgresql memory maintenance worker memory
+
+      # data pulled into memory on joins can exceed default worker mem and then pull in segments multiple times to complete joins when and join condition was met
+      # based on 32GB RAM
+      - name: POSTGRESQL TUNING OVERLAY | configuring postgresql worker memory
+        lineinfile:
+          owner: "{{ postgresql_user }}"
+          path: "{{ postgresql_config_path }}/postgresql.conf"
+          regexp: '^#work_mem = 4MB				# min 64kB'
+          line: "work_mem = 4GB				# min 64kB"
+          backrefs: yes
+
+      # based on 32GB RAM
+      - name: POSTGRESQL TUNING OVERLAY | configuring postgresql max locks per transaction
+        lineinfile:
+          owner: "{{ postgresql_user }}"
+          path: "{{ postgresql_config_path }}/postgresql.conf"
+          regexp: '^#max_locks_per_transaction = 64		# min 10'
+          line: "max_locks_per_transaction = 32		# min 10"
+          backrefs: yes
+          
+      - name: POSTGRESQL TUNING OVERLAY | configuring postgresql maintenance worker memory
         lineinfile:
           path: "{{ postgresql_config_path }}/postgresql.conf"
           regexp: '^#maintenance_work_mem = 64MB'
@@ -163,12 +182,5 @@
            #      path: "{{ postgresql_config_path }}/postgresql.conf"
            #      regexp: '^#max_parallel_workers_per_gather = 0'
            #      line: "max_parallel_workers_per_gather = 1    # taken from max_worker_processes"
-           #      backrefs: yes
-           #    become_user: "{{ postgresql_user }}"
-           #  - name: POSTGRESQL TUNING OVERLAY | configuring postgresql work memory
-           #    lineinfile:
-           #      path: "{{ postgresql_config_path }}/postgresql.conf"
-           #      regexp: '^#work_mem = 4MB'
-           #      line: "work_mem = 4MB                         # min 64kB"
            #      backrefs: yes
            #    become_user: "{{ postgresql_user }}"

@@ -21,7 +21,7 @@
         register: postgresql_replica_instances
   
       - name: POSTGRESQL ENCRYPTION OVERLAY | building postgresql replica host group
-        add_host: hostname="{{ item }}" groupname=postgresql_replica ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
+        add_host: hostname="{{ item }}" groupname=postgresql_replica ansible_user="{{ user }}" ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
         with_items: "{{ postgresql_replica_instances.instances | map(attribute='private_ip_address') | list }}"
         when:
           - postgresql_replica_instances is defined
@@ -45,7 +45,7 @@
         register: shaw_instances
 
       - name: POSTGRESQL ENCRYPTION OVERLAY | building shaw host group
-        add_host: hostname="{{ item }}" groupname=shaw ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-shaw-{{ domain }}-private-key.pem"
+        add_host: hostname="{{ item }}" groupname=shaw ansible_user="{{ shaw_user }}" ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-shaw-{{ domain }}-private-key.pem"
         with_items: "{{ shaw_instances.instances | map(attribute='private_ip_address') | list }}"
         when:
           - shaw_instances is defined
@@ -130,7 +130,7 @@
         register: postgresql_instances
 
       - name: POSTGRESQL ENCRYPTION OVERLAY | building postgresql host group
-        add_host: hostname="{{ item }}" groupname=postgresql ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
+        add_host: hostname="{{ item }}" groupname=postgresql ansible_user="{{ user }}" ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
         with_items: "{{ postgresql_instances.instances | map(attribute='private_ip_address') | list }}"
         when:
           - postgresql_instances is defined
@@ -269,7 +269,7 @@
         register: postgresql_master_instances
 
       - name: POSTGRESQL ENCRYPTION OVERLAY | building postgresql replica host group
-        add_host: hostname="{{ item }}" groupname=postgresql_master ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
+        add_host: hostname="{{ item }}" groupname=postgresql_master ansible_user="{{ user }}" ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
         with_items: "{{ postgresql_master_instances.instances | map(attribute='private_ip_address') | list }}"
         when:
           - postgresql_master_instances is defined

@@ -1,0 +1,24 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# create AWS postgresql security group rules
+---
+- name: ENCRYPTION OVERLAY (AWS) | updating confluent kafka broker private external security group
+  local_action:
+    module: ec2_group
+    name: "dnsg_{{ project }}_kafka_private_external"
+    description: "kafka broker external ingress and unrestricted egress rules (ansible)"
+    vpc_id: "{{ specified_vpc.vpcs.0.id }}"
+    region: "{{ region }}"
+    rules:
+      # SSL
+      - proto: tcp
+        from_port: "{{ kafka.broker.config.ssl }}"
+        to_port: "{{ kafka.broker.config.ssl }}"
+        cidr_ip: "{{ external_subnet }}" 
+    rules_egress:
+      # Allow all outbound
+      - proto: all
+        cidr_ip: 0.0.0.0/0
+  when: "'kafka_broker' in groups | default([])"
+  register: sg_kafka_external
+

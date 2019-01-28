@@ -1,0 +1,62 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# enable broker encryption
+---
+- block:
+  
+  - name: ENCRYPTION OVERLAY (SCHEMA REGISTRY) | checking existing server keystore
+    stat:
+      path: "/etc/tls/{{ tenant }}/{{ broker.application }}"
+    register: kafka_server_key
+  
+  - name: ENCRYPTION OVERLAY (SCHEMA REGISTRY) | ensure TLS {{ broker.application }} directory is present
+    file:
+      path: /etc/tls/{{ tenant }}/{{ broker.application }}
+      state: directory
+      mode: 0755
+      owner: "{{ schema.registry.user }}"
+      group: "{{ schema.registry.group }}"
+    when: not kafka_server_key.stat.exists
+
+  - name: ENCRYPTION OVERLAY (SCHEMA REGISTRY) | distributing certificates to control center node(s)
+    copy:
+      src: "{{ item }}"
+      dest: "/etc/tls/{{ tenant }}/{{ broker.application }}/"
+      owner: "{{ schema.registry.user }}"
+      group: "{{ schema.registry.group }}"
+      mode: 0600
+    with_items:
+      - "{{ key_path }}/kafka.client.keystore.jks"
+      - "{{ key_path }}/kafka.client.truststore.jks"  
+    notify: restart registry
+  
+  - name: ENCRYPTION OVERLAY (SCHEMA REGISTRY) | disabling zookeeper connections
+    lineinfile:
+      path: "{{ schema.registry.config_file }}"
+      regexp: "^kafkastore.connection.url={{ groups['zookeeper'] | join(':' + zookeeper.config.port + ',') }}:{{ zookeeper.config.port }}"
+      line: "#kafkastore.connection.url={{ groups['zookeeper'] | join(':' + zookeeper.config.port + ',') }}:{{ zookeeper.config.port }}"
+    notify: restart registry
+    
+  - name: ENCRYPTION OVERLAY (SCHEMA REGISTRY) | configuring bootstrap servers
+    lineinfile:
+      path: "{{ schema.registry.config_file }}"
+      regexp: '^kafkastore.bootstrap.servers='
+      line: "kafkastore.bootstrap.servers=SSL://{{ groups['kafka_public'] | join(':' + broker.config.sslPort + ',SSL://') }}:{{ broker.config.sslPort }}"
+      insertafter: '^#kafkastore.bootstrap.servers='
+    notify: restart registry
+      
+  - name: ENCRYPTION OVERLAY (SCHEMA REGISTRY) | enabling SSL for broker communication
+    blockinfile:
+      path: "{{ schema.registry.config_file }}"
+      insertafter: EOF
+      state: present
+      block: |
+        kafkastore.security.protocol=SSL
+        kafkastore.ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+        kafkastore.ssl.truststore.password={{ storepass }}
+        kafkastore.ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+        kafkastore.ssl.keystore.password={{ storepass }}
+        kafkastore.ssl.key.password={{ keypass }}
+    notify: restart registry
+  
+  become: true

@@ -1,0 +1,189 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# application specific stores
+---
+- block:
+  
+  - name: ENCRYPTION OVERLAY (CA) | checking existing TLS {{ broker.application }} path
+    stat:
+      path: "/etc/tls/{{ tenant }}/{{ broker.application }}"
+    register: broker_server_dir
+
+  - name: ENCRYPTION OVERLAY (CA) | ensuring TLS {{ broker.application }} path exists
+    file:
+      path: /etc/tls/{{ tenant }}/{{ broker.application }}
+      state: directory
+      mode: 0755
+    when: not broker_server_dir.stat.exists
+
+  - name: ENCRYPTION OVERLAY (CA) | checking existing TLS {{ telegraf.service_name }} path
+    stat:
+      path: "/etc/tls/{{ tenant }}/{{ telegraf.service_name }}"
+    register: telegraf_dir
+    when:
+      - using_telegraf | default (telegraf.enabled)
+      
+  - name: ENCRYPTION OVERLAY (CA) | ensuring {{ telegraf.service_name }} path exists
+    file:
+      path: /etc/tls/{{ tenant }}/{{ telegraf.service_name }}
+      state: directory
+      mode: 0755
+      owner: "{{ telegraf.user }}"
+      group: "{{ telegraf.group }}"
+    when:
+      - using_telegraf | default (telegraf.enabled)
+      - not telegraf_dir.stat.exists
+    
+  - name: ENCRYPTION OVERLAY (CA) | copying default openssl.cnf
+    command: /bin/cp /etc/pki/tls/openssl.cnf /etc/tls/{{ tenant }}/{{ broker.application }}
+    when: regenerate_certs
+      
+  # required in current jvms
+  # - name: ENCRYPTION OVERLAY (CA) | enabling certificate request extensions
+ #    lineinfile:
+ #      path: "/etc/tls/{{ tenant }}/{{ broker.application }}/openssl.cnf"
+ #      regexp: '^req_extensions = v3_req # The extensions to add to a certificate request'
+ #      line: "req_extensions = v3_req # The extensions to add to a certificate request"
+ #      insertafter: '^# req_extensions ='
+      
+  # required in current jvms
+  # - name: ENCRYPTION OVERLAY (CA) | subject key identifier
+  #   lineinfile:
+  #     path: "/etc/tls/{{ tenant }}/{{ broker.application }}/openssl.cnf"
+  #     regexp: '^subjectKeyIdentifier\t='
+  #     line: "subjectKeyIdentifier\t= hash"
+  #     insertafter: '^\[ v3_ca \]'
+  
+  # required in current jvms
+  # - name: ENCRYPTION OVERLAY (CA) | authority key identifier
+ #    lineinfile:
+ #      path: "/etc/tls/{{ tenant }}/{{ broker.application }}/openssl.cnf"
+ #      regexp: '^authorityKeyIdentifier\t='
+ #      line: "authorityKeyIdentifier\t= keyid:always,issuer:always"
+ #      insertafter: '^subjectKeyIdentifier\t='
+
+  # minimal required in latest jvms
+  - name: ENCRYPTION OVERLAY (CA) | adding subject alternative names to v3_ext
+    lineinfile:
+      path: "/etc/tls/{{ tenant }}/{{ broker.application }}/openssl.cnf"
+      regexp: '^subjectAltName\t\t='
+      line: "subjectAltName\t\t= IP:{{ groups['kafka_public'] | join(',' +  'IP:') }}"
+      insertafter: '^\[ v3_ca \]'
+      # insertafter: '^authorityKeyIdentifier\t='
+    when: regenerate_certs
+    
+  # required in current jvms
+  # - name: ENCRYPTION OVERLAY (CA) | adding subject alternative names to v3_req
+ #    lineinfile:
+ #      path: "/etc/tls/{{ tenant }}/{{ broker.application }}/openssl.cnf"
+ #      regexp: '^subjectAltName\t\t='
+ #      line: "subjectAltName\t\t= IP:{{ groups['kafka_public'] | join(',' +  'IP:') }}"
+ #      insertafter: '^\[ v3_req \]'
+      
+  # required in current jvms
+  # - name: ENCRYPTION OVERLAY (CA) | issue alternative names
+ #    lineinfile:
+ #      path: "/etc/tls/{{ tenant }}/{{ broker.application }}/openssl.cnf"
+ #      regexp: '^issuerAltName\t\t='
+ #      line: "issuerAltName\t\t= issuer:copy"
+ #      insertafter: '^subjectAltName\t\t='
+      
+  - name: ENCRYPTION OVERLAY (CA) | removing existing {{ broker.application }} credentials 
+    file:
+      path: /etc/tls/{{ tenant }}/{{ broker.application }}/{{ item }}
+      state: absent
+    with_items:
+      - kafka.server.keystore.jks
+      - kafka.server.truststore.jks
+      - ca-cert
+      - ca-cert.srl
+      - ca-key
+      - unsigned-ca-cert
+      - signed-ca-cert
+    when: regenerate_certs
+  
+  - name: ENCRYPTION OVERLAY (TELEGRAF) | removing existing telegraf.service_name credentials 
+    file:
+      path: /etc/tls/{{ tenant }}/{{ telegraf.service_name }}/{{ item }}
+      state: absent
+    with_items:
+      - ca-key.unec
+    when: regenerate_certs
+    
+  - name: ENCRYPTION OVERLAY (CA) | checking existing server keystore
+    stat:
+      path: "/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.server.keystore.jks"
+    register: server_keystore
+  
+  - name: ENCRYPTION OVERLAY (CA) | generating server keystore
+    command: /usr/bin/keytool -keystore /etc/tls/{{ tenant }}/{{ broker.application }}/kafka.server.keystore.jks -alias localhost -validity {{ duration }} -genkey -keyalg RSA -storepass {{ storepass }} -keypass {{ keypass }} -dname "CN={{ certs.CN }}, OU={{ certs.OU }}, O={{ certs.O }}, L={{ certs.L }}, C={{ certs.C }}"
+    when: not server_keystore.stat.exists
+
+  # openssl x509 -in ca-cert -text -noout
+  - name: ENCRYPTION OVERLAY (CA) | generating CA private key and self-signed certificate
+    command: /usr/bin/openssl req -new -x509 -config /etc/tls/{{ tenant }}/{{ broker.application }}/openssl.cnf -extensions v3_ca -keyout /etc/tls/{{ tenant }}/{{ broker.application }}/ca-key -out /etc/tls/{{ tenant }}/{{ broker.application }}/ca-cert -days {{ duration }} -passout pass:{{ keypass }} -subj "/CN={{ hostvars[inventory_hostname].ansible_facts.fqdn }}/OU={{ certs.OU }}/O={{ certs.O }}/L={{ certs.L }}/C={{ certs.C }}"
+    when: not server_keystore.stat.exists
+  
+  - name: ENCRYPTION OVERLAY (CA) | checking existing unencrypted ca key
+    stat:
+      path: "/etc/tls/{{ tenant }}/{{ telegraf.service_name }}/ca-key.unec"
+    register: existing_unencrytped_ca_key
+
+  - name: ENCRYPTION OVERLAY (TELEGRAF) | stripping encryption from private key
+    command: /usr/bin/openssl rsa -in /etc/tls/{{ tenant }}/{{ broker.application }}/ca-key -out /etc/tls/{{ tenant }}/{{ telegraf.service_name }}/ca-key.unec -passin pass:{{ keypass }}
+    when:
+      - using_telegraf | default (telegraf.enabled)
+      - not existing_unencrytped_ca_key.stat.exists
+    
+  - name: ENCRYPTION OVERLAY (CA) | checking existing server truststore
+    stat:
+      path: "/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.server.truststore.jks"
+    register: kafka_server_trust
+  
+  - name: ENCRYPTION OVERLAY (CA) | importing CA certificate into server truststore
+    command: /usr/bin/keytool -keystore /etc/tls/{{ tenant }}/{{ broker.application }}/kafka.server.truststore.jks -alias CARoot -import -file /etc/tls/{{ tenant }}/{{ broker.application }}/ca-cert -storepass {{ storepass }} -keypass {{ keypass }} -noprompt
+    when: not kafka_server_trust.stat.exists
+  
+  - name: ENCRYPTION OVERLAY (CA) | exporting unsigned server certificate from broker keystore
+    command: /usr/bin/keytool -keystore /etc/tls/{{ tenant }}/{{ broker.application }}/kafka.server.keystore.jks -alias localhost -certreq -file /etc/tls/{{ tenant }}/{{ broker.application }}/unsigned-ca-cert -storepass {{ storepass }}
+    
+  - name: ENCRYPTION OVERLAY (CA) | signing unsigned server certificate with CA private key
+    command: /usr/bin/openssl x509 -extfile /etc/tls/{{ tenant }}/{{ broker.application }}/openssl.cnf -extensions v3_ca -req -CA /etc/tls/{{ tenant }}/{{ broker.application }}/ca-cert -CAkey /etc/tls/{{ tenant }}/{{ broker.application }}/ca-key -in /etc/tls/{{ tenant }}/{{ broker.application }}/unsigned-ca-cert -out /etc/tls/{{ tenant }}/{{ broker.application }}/signed-ca-cert -days {{ duration }} -CAcreateserial -passin pass:{{ keypass }}
+    
+  - name: ENCRYPTION OVERLAY (CA) | importing unsigned server certificate into broker keystore
+    command: /usr/bin/keytool -keystore /etc/tls/{{ tenant }}/{{ broker.application }}/kafka.server.keystore.jks -alias CARoot -import -file /etc/tls/{{ tenant }}/{{ broker.application }}/ca-cert -storepass {{ storepass }} -noprompt
+    when: not server_keystore.stat.exists
+  
+  - name: ENCRYPTION OVERLAY (CA) | importing signed server certificate into broker keystore
+    command: /usr/bin/keytool -keystore /etc/tls/{{ tenant }}/{{ broker.application }}/kafka.server.keystore.jks -alias localhost -import -file /etc/tls/{{ tenant }}/{{ broker.application }}/signed-ca-cert -storepass {{ storepass }} -noprompt
+    when: not server_keystore.stat.exists
+
+  - name: ENCRYPTION OVERLAY (CA) | removing unnecessary files
+    file:
+      path: /etc/tls/{{ tenant }}/{{ broker.application }}/{{ item }}
+      state: absent
+    with_items:
+      - ca-cert.srl
+    when: cleanup
+  
+  - name: ENCRYPTION OVERLAY (CA) | fetching ca broker files
+    fetch:
+      src: "/etc/tls/datanexus/{{ broker.application }}/{{ item }}"
+      dest: "{{ key_path }}/{{ item }}"
+      flat: yes
+    with_items:
+      - kafka.server.keystore.jks
+      - kafka.server.truststore.jks
+      - ca-cert
+  
+  - name: ENCRYPTION OVERLAY (TELEGRAF) | fetching unencrypted key
+    fetch:
+      src: "/etc/tls/datanexus/{{ telegraf.service_name }}/{{ item }}"
+      dest: "{{ key_path }}/{{ item }}"
+      flat: yes
+    with_items:
+      - ca-key.unec
+    when:
+      - using_telegraf | default (telegraf.enabled)
+      
+  become: true

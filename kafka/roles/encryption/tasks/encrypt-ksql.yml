@@ -1,0 +1,66 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# enable broker encryption
+---
+- block:
+  
+  - name: ENCRYPTION OVERLAY (KSQL) | checking existing server keystore
+    stat:
+      path: "/etc/tls/{{ tenant }}/{{ broker.application }}"
+    register: kafka_server_key
+  
+  - name: ENCRYPTION OVERLAY (KSQL) | ensure TLS {{ broker.application }} directory is present
+    file:
+      path: /etc/tls/{{ tenant }}/{{ broker.application }}
+      state: directory
+      mode: 0755
+      owner: "{{ ksql.user }}"
+      group: "{{ ksql.group }}"
+    when: not kafka_server_key.stat.exists
+
+  - name: ENCRYPTION OVERLAY (KSQL) | distributing certificates to connect node(s)
+    copy:
+      src: "{{ item }}"
+      dest: "/etc/tls/{{ tenant }}/{{ broker.application }}/"
+      owner: "{{ ksql.user }}"
+      group: "{{ ksql.group }}"
+      mode: 0600
+    with_items:
+      - "{{ key_path }}/kafka.client.keystore.jks"
+      - "{{ key_path }}/kafka.client.truststore.jks"
+    notify: restart ksql
+  
+  - name: ENCRYPTION OVERLAY (KSQL) | configuring bootstrap servers
+    lineinfile:
+      path: "{{ ksql.config_file }}"
+      regexp: '^bootstrap.servers='
+      line: "bootstrap.servers={{ groups['kafka_public'] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}"
+      insertafter: '^#bootstrap.servers='
+    notify: restart ksql
+  
+  - name: ENCRYPTION OVERLAY (KSQL) | configuring registry url
+    lineinfile:
+      path: "{{ ksql.config_file }}"
+      regexp: '^ksql.schema.registry.url='
+      line: "ksql.schema.registry.url=http://{{ groups['registry_public'] | join(':' + schema.registry.config.listener_port + ',http://') }}:{{ schema.registry.config.listener_port }}"
+    notify: restart ksql
+    when: 
+      - groups['registry'] is defined
+      - groups['registry'] | length > 0
+      
+  - name: ENCRYPTION OVERLAY (KSQL) | enabling SSL for broker communication
+    blockinfile:
+      path: "{{ ksql.config_file }}"
+      marker: "# ksql SSL {mark} ANSIBLE MANAGED BLOCK"
+      insertafter: EOF
+      state: present
+      block: |
+        security.protocol=SSL
+        ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+        ssl.truststore.password={{ storepass }}
+        ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+        ssl.keystore.password={{ storepass }}
+        ssl.key.password={{ keypass }}
+    notify: restart broker
+      
+  become: true

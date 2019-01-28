@@ -1,0 +1,8 @@
+bootstrap.servers={{ groups['kafka_public'] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}
+security.protocol=SSL
+ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+ssl.truststore.password={{ storepass }}
+ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+ssl.keystore.password={{ storepass }}
+ssl.key.password={{ keypass }}
+

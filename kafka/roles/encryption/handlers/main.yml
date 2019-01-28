@@ -1,0 +1,50 @@
+# (c) Copyright 2018 DataNexus Inc.  All Rights Reserved.
+#
+# handlers used during confluent platform installation
+---
+- name: restart broker
+  systemd:
+    name: "{{ broker.service_name }}"
+    state: restarted
+  become: true
+
+- name: restart registry 
+  systemd:
+    name: "{{ schema.registry.service_name }}"
+    state: restarted
+  become: true
+
+# this can sometimes take a few minutes
+- name: restart controlcenter
+  systemd:
+    name: "{{ control.center.service_name }}"
+    state: restarted
+  become: true
+  
+- name: restart connect
+  systemd:
+    name: "{{ connect.distributed.service_name }}"
+    state: restarted
+  become: yes
+
+- name: restart ksql
+  systemd:
+    name: "{{ ksql.service_name }}"
+    state: restarted
+  become: true
+
+- name: restart kafkarest
+  systemd:
+    name: "{{ kafkarest.service_name }}"
+    state: restarted
+  become: true
+
+- name: restart telegraf
+  systemd:
+    name: "{{ telegraf.service_name }}" 
+    state: restarted
+  become: true
+  
+- name: reload systemd
+  command: systemctl daemon-reload
+  become: true

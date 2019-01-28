@@ -1,0 +1,87 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# enable broker encryption
+---
+- block:
+  
+  - name: ENCRYPTION OVERLAY (CONNECTOR) | checking existing server keystore
+    stat:
+      path: "/etc/tls/{{ tenant }}/{{ broker.application }}"
+    register: kafka_server_key
+  
+  - name: ENCRYPTION OVERLAY (CONNECTOR) | ensure TLS {{ broker.application }} directory is present
+    file:
+      path: /etc/tls/{{ tenant }}/{{ broker.application }}
+      state: directory
+      mode: 0755
+      owner: "{{ connect.distributed.user }}"
+      group: "{{ connect.distributed.group }}"
+    when: not kafka_server_key.stat.exists
+
+  - name: ENCRYPTION OVERLAY (CONNECTOR) | distributing certificates to connect node(s)
+    copy:
+      src: "{{ item }}"
+      dest: "/etc/tls/{{ tenant }}/{{ broker.application }}/"
+      owner: "{{ connect.distributed.user }}"
+      group: "{{ connect.distributed.group }}"
+      mode: 0600
+    with_items:
+      - "{{ key_path }}/kafka.client.keystore.jks"
+      - "{{ key_path }}/kafka.client.truststore.jks"
+  
+  - name: ENCRYPTION OVERLAY (CONNECTOR) | configuring bootstrap servers
+    lineinfile:
+      path: "{{ connect.distributed.config_file }}"
+      regexp: '^bootstrap.servers='
+      line: "bootstrap.servers={{ groups['kafka_public'] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}"
+      insertafter: '^#bootstrap.servers='
+    notify: restart connect
+  
+  - name: ENCRYPTION OVERLAY (CONNECTOR) | enabling SSL
+    blockinfile:
+      path: "{{ connect.distributed.config_file }}"
+      marker: "# connect SSL {mark} ANSIBLE MANAGED BLOCK"
+      insertafter: EOF
+      state: present
+      block: |
+        security.protocol=SSL
+        ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+        ssl.truststore.password={{ storepass }}
+        ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+        ssl.keystore.password={{ storepass }}
+        ssl.key.password={{ keypass }}
+    notify: restart connect
+    
+  # - name: ENCRYPTION OVERLAY (CONNECTOR) | enabling SSL for producers
+#     blockinfile:
+#       path: "{{ connect.distributed.config_file }}"
+#       marker: "# producer SSL {mark} ANSIBLE MANAGED BLOCK"
+#       insertafter: EOF
+#       state: present
+#       block: |
+#         producer.confluent.monitoring.interceptor.bootstrap.servers={{ groups['kafka_public'] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}
+#         producer.confluent.monitoring.interceptor.security.protocol=SSL
+#         producer.confluent.monitoring.interceptor.ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+#         producer.confluent.monitoring.interceptor.ssl.truststore.password={{ storepass }}
+#         producer.confluent.monitoring.interceptor.ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+#         producer.confluent.monitoring.interceptor.ssl.keystore.password={{ storepass }}
+#         producer.confluent.monitoring.interceptor.ssl.key.password={{ keypass }}
+#     notify: restart connect
+#
+#   - name: ENCRYPTION OVERLAY (CONNECTOR) | enabling SSL for producers
+#     blockinfile:
+#       path: "{{ connect.distributed.config_file }}"
+#       marker: "# consumer SSL {mark} ANSIBLE MANAGED BLOCK"
+#       insertafter: EOF
+#       state: present
+#       block: |
+#         consumer.confluent.monitoring.interceptor.bootstrap.servers={{ groups['kafka_public'] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}
+#         consumer.confluent.monitoring.interceptor.security.protocol=SSL
+#         consumer.confluent.monitoring.interceptor.ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+#         consumer.confluent.monitoring.interceptor.ssl.truststore.password={{ storepass }}
+#         consumer.confluent.monitoring.interceptor.ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+#         consumer.confluent.monitoring.interceptor.ssl.keystore.password={{ storepass }}
+#         consumer.confluent.monitoring.interceptor.ssl.key.password={{ keypass }}
+#     notify: restart connect
+  
+  become: true

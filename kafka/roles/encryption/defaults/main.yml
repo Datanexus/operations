@@ -1,0 +1,51 @@
+broker:
+  application: kafka_broker
+  user: cp-kafka
+  group: confluent
+  service_name: confluent-kafka
+  config_file: /etc/kafka/server.properties
+  config:
+    port: '9092'
+    sslPort: '9091'
+zookeeper:
+  application: zookeeper
+  config:
+    port: '2181'
+connect:
+  distributed:
+    config_file: /etc/kafka/connect-distributed.properties
+    service_name: confluent-kafka-connect
+    user: cp-kafka-connect
+    group: confluent
+schema:
+  registry:
+    user: cp-schema-registry
+    group: confluent
+    config_file: /etc/schema-registry/schema-registry.properties
+    service_name: confluent-schema-registry
+    config:
+      listener_port: '8081'
+control:
+  center:
+    user: cp-control-center
+    group: confluent
+    config_file: /etc/confluent-control-center/control-center-production.properties
+    service_name: confluent-control-center
+ksql:
+  config_file: /etc/ksql/ksql-server.properties
+  service_name: confluent-ksql
+  user: cp-ksql
+  group: confluent
+kafkarest:
+  user: cp-kafka-rest
+  group: confluent
+  config_file: /etc/kafka-rest/kafka-rest.properties
+  service_name: confluent-kafka-rest
+  config:
+    rest_port: 8082
+telegraf:
+  enabled: yes
+  user: telegraf
+  group: telegraf
+  config_file: /etc/telegraf/telegraf.conf
+  service_name: telegraf

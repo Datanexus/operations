@@ -1,0 +1,80 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# enable broker encryption
+---
+- import_tasks: interface-facts.yml
+
+- block:
+  
+  - name: ENCRYPTION OVERLAY (REST PROXY) | checking existing server keystore
+    stat:
+      path: "/etc/tls/{{ tenant }}/{{ broker.application }}"
+    register: kafka_server_key
+  
+  - name: ENCRYPTION OVERLAY (REST PROXY) | ensure TLS {{ broker.application }} directory is present
+    file:
+      path: /etc/tls/{{ tenant }}/{{ broker.application }}
+      state: directory
+      mode: 0755
+      owner: "{{ kafkarest.user }}"
+      group: "{{ kafkarest.group }}"
+    when: not kafka_server_key.stat.exists
+
+  - name: ENCRYPTION OVERLAY (REST PROXY) | distributing certificates to control center node(s)
+    copy:
+      src: "{{ item }}"
+      dest: "/etc/tls/{{ tenant }}/{{ broker.application }}/"
+      owner: "{{ kafkarest.user }}"
+      group: "{{ kafkarest.group }}"
+      mode: 0600
+    with_items:
+      - "{{ key_path }}/kafka.client.keystore.jks"
+      - "{{ key_path }}/kafka.client.truststore.jks"  
+    notify: restart kafkarest
+    
+  - name: ENCRYPTION OVERLAY (REST PROXY) | configuring bootstrap servers
+    lineinfile:
+      path: "{{ kafkarest.config_file }}"
+      regexp: '^bootstrap.servers='
+      line: "bootstrap.servers=SSL://{{ groups['kafka_public'] | join(':' + broker.config.sslPort + ',SSL://') }}:{{ broker.config.sslPort }}"
+    notify: restart kafkarest
+  
+  # SSL to the listener is not currently available
+  # - name: ENCRYPTION OVERLAY (REST PROXY) | configuring listener
+#     lineinfile:
+#       path: "{{ kafkarest.config_file }}"
+#       regexp: "^listeners=http://{{ kafka_interface_ipv4 }}:{{ kafkarest.config.rest_port }}"
+#       line: "listeners=https://{{ kafka_interface_ipv4 }}:{{ kafkarest.config.rest_port }}"
+#     notify: restart kafkarest
+  
+  - name: ENCRYPTION OVERLAY (REST PROXY) | enabling https between ReST clients and the ReST proxy
+    blockinfile:
+      path: "{{ kafkarest.config_file }}"
+      marker: "# client HTTPS {mark} ANSIBLE MANAGED BLOCK"
+      insertafter: EOF
+      state: present
+      block: |
+        ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+        ssl.truststore.password={{ storepass }}
+        ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+        ssl.keystore.password={{ storepass }}
+        ssl.key.password={{ keypass }}
+    notify: restart kafkarest
+    
+  - name: ENCRYPTION OVERLAY (REST PROXY) | enabling ssl encryption and authentication between ReST proxy and the kafka cluster
+    blockinfile:
+      path: "{{ kafkarest.config_file }}"
+      marker: "# broker client SSL {mark} ANSIBLE MANAGED BLOCK"
+      insertafter: EOF
+      state: present
+      block: |
+        client.bootstrap.servers={{ groups['kafka_public'] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}"
+        client.security.protocol=SSL
+        client.ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+        client.ssl.truststore.password={{ storepass }}
+        client.ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+        client.ssl.keystore.password={{ storepass }}
+        client.ssl.key.password={{ keypass }}
+    notify: restart kafkarest
+  
+  become: true

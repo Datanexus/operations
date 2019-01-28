@@ -1,0 +1,18 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# install kafka cluster helper utilities
+---
+- block:
+
+  - name: ENCRYPTION OVERLAY (POSTFLIGHT) | installing updated kafka topic consume utility for encrypted brokers
+    template:
+      src: consume-topic.j2
+      dest: "{{ utilsDir | default (postflight.utilsDir) }}/consume-topic"
+      mode: 0755
+      owner: "{{ broker.user }}"
+      group: "{{ broker.group }}"
+    when:
+      - groups['kafka_broker'] is defined
+      - groups['kafka_broker'] | length > 0
+      
+  become: true

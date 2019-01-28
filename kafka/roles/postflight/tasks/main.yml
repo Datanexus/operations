@@ -1,0 +1,32 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# tasks that occur post-appplication installation
+---
+# install helper utilities
+- import_tasks: utilities.yml
+
+- block:
+  
+  - name: ENCRYPTION OVERLAY (POSTFLIGHT) | checking existing server keystore
+    stat:
+      path: "/etc/tls/{{ tenant }}/{{ broker.application }}"
+    register: kafka_server_key
+  
+  - name: ENCRYPTION OVERLAY (POSTFLIGHT) | ensure TLS kafka directory is present
+    file:
+      path: /etc/tls/{{ tenant }}/{{ broker.application }}
+      state: directory
+      mode: 0755
+      owner: "{{ ansible_user }}"
+      group: "{{ ansible_user }}"
+    when: not kafka_server_key.stat.exists
+    
+  - name: ENCRYPTION OVERLAY (POSTFLIGHT) | updating client ssl properties
+    template:
+      src: client-ssl.properties.j2
+      dest: "/etc/tls/{{ tenant }}/{{ broker.application }}/client-ssl.properties"
+      mode: 0644
+      owner: "{{ ansible_user }}"
+      group:  "{{ ansible_user }}"
+  
+  become: yes

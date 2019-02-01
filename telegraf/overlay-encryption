@@ -1,0 +1,64 @@
+#!/usr/bin/env ansible-playbook
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# overlay broker-to-broker, client-to-broker encryption over top of an existing kafka cluster
+# https://www.confluent.io/blog/apache-kafka-security-authorization-authentication-encryption/
+---
+- name: ENCRYPTION OVERLAY (TELEGRAF) | discovering all kafka broker nodes
+  hosts: localhost
+  vars_files:
+    - roles/encryption/defaults/main.yml
+  tasks:
+    - ec2_instance_facts:
+        region: "{{ region }}"
+        filters:
+          instance-state-name: running
+          "tag:Application": kafka-broker
+          "tag:Domain": "{{ domain }}"
+          "tag:Project": "{{ project }}"
+          "tag:Tenant": "{{ tenant }}"
+      register: kafka_instances
+      when:
+        - groups['kafka-broker'] is not defined
+        - cloud == 'aws'
+    
+    - name: ENCRYPTION OVERLAY (TELEGRAF) | building kafka broker host group
+      add_host: hostname="{{ item }}" groupname=kafka-broker ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-{{ broker.application }}-{{ domain }}-private-key.pem"
+      with_items: "{{ kafka_instances.instances|map(attribute='private_ip_address')|list }}"
+      when:
+        - kafka_instances.instances is defined
+        - kafka_instances.instances | length > 0
+
+# this is necessary before we build host groups from the ansible server
+- name: ENCRYPTION OVERLAY (TELEGRAF) | discovering kafka broker facts
+  hosts: kafka_broker
+  tasks:
+    - setup:
+      
+- name: ENCRYPTION OVERLAY (TELEGRAF) | building kafka broker public internal host group
+  hosts: localhost
+  vars_files:
+    - roles/encryption/defaults/main.yml
+  gather_facts: no
+  tasks:
+    - name: ENCRYPTION OVERLAY | building kafka broker public internal host group
+      add_host: hostname="{{ hostvars[item].ansible_eth1.ipv4.address }}" groupname=kafka_public
+      with_items: "{{ groups['kafka_broker'] }}"
+      when: "'kafka_broker' in groups | default([])"
+
+# once the brokers are done we can reconfigure all telegraf clients   
+- name: ENCRYPTION OVERLAY (TELEGRAF) | configuring telegraf encryption
+  hosts: all:!kafka_public
+  vars_files:
+    - vars/encryption.yml
+    - roles/encryption/defaults/main.yml
+    - "{{ tenant_config_path }}/config/site.yml"
+  vars:
+    # this is semi clever; application gets set based on each host group
+    application: "{{ group_names | first }}"
+  gather_facts: no
+  tasks:
+    - include_role:
+        name: encryption
+        tasks_from: encrypt-telegraf
+      when: using_telegraf | default (telegraf.enabled)

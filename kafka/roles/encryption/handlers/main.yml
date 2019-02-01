@@ -2,6 +2,10 @@
 #
 # handlers used during confluent platform installation
 ---
+- name: reload systemd
+  command: systemctl daemon-reload
+  become: true
+  
 - name: restart broker
   systemd:
     name: "{{ broker.service_name }}"
@@ -37,14 +41,4 @@
   systemd:
     name: "{{ kafkarest.service_name }}"
     state: restarted
-  become: true
-
-- name: restart telegraf
-  systemd:
-    name: "{{ telegraf.service_name }}" 
-    state: restarted
-  become: true
-  
-- name: reload systemd
-  command: systemctl daemon-reload
   become: true

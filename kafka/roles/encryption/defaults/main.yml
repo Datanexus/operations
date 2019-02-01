@@ -45,7 +45,6 @@ kafkarest:
     rest_port: 8082
 telegraf:
   enabled: yes
+  service_name: telegraf
   user: telegraf
   group: telegraf
-  config_file: /etc/telegraf/telegraf.conf
-  service_name: telegraf

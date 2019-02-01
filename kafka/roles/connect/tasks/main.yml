@@ -1,0 +1,64 @@
+# (c) Copyright 2018 DataNexus Inc.  All Rights Reserved.
+#
+#
+---
+- block:
+  
+  - set_fact:
+      all_connectors: "{{ connectors }} + {{ connect.distributed.connectors }}"
+    when: connectors is defined
+  
+  - set_fact:
+      all_connectors: "{{ connect.distributed.connectors }}"
+    when: connectors is undefined
+  
+  - name: CONFLUENT OVERLAY (BROKER) | checking existing connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
+    uri:
+      url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors"
+      method: GET
+      status_code: 200
+    register: active_connectors
+  
+  # only POST a new connector if the name is unique
+  - name: CONFLUENT OVERLAY (BROKER) | creating connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
+    uri:
+      url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors"
+      method: POST
+      body: "{{ item }}"
+      status_code: 201
+      body_format: json
+    loop: "{{ all_connectors }}"
+    loop_control:
+      loop_var: item
+    when: not item.name in active_connectors.json
+    
+  # - name: CONFLUENT OVERLAY (BROKER) | updating elasticsearch sink
+#     uri:
+#       url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors{{ item.name }}/config"
+#       method: PUT
+#       body: "{{ item }}"
+#       status_code: 200
+#       body_format: json
+#     loop: "{{ all_connectors }}"
+#     loop_control:
+#       loop_var: item
+#
+#     uri:
+#       url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/{{ item.name }}/config"
+#       method: PUT
+#       body:
+#         connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
+#         tasks.max: 2
+#         topics: telegraf_log
+#         topic.index.map: telegraf_log:logs_index
+#         connection.url: "http://{{ groups['elasticsearch_public'] | first }}:{{ elasticsearch.config.restPort }}"
+#         type.name: true
+#         key.ignore: true
+#         schema.ignore: true
+#       status_code: 200
+#       body_format: json
+#     loop: "{{ all_connectors }}"
+#     loop_control:
+#       loop_var: item
+#     when: item.name in active_connectors.json
+#

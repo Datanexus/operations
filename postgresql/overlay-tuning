@@ -11,6 +11,7 @@
   hosts: localhost
   tasks:
     - block:
+      
       - ec2_instance_facts:
           region: "{{ region }}"
           filters:
@@ -27,8 +28,61 @@
         when:
           - postgresql_instances is defined
           - postgresql_instances.instances | length > 0
+
       when:
         - cloud == 'aws'
+
+    - block:
+      
+      - name: AZURE RESOURCE GROUP OVERLAY | retrieving resource group by name
+        azure_rm_resourcegroup_facts:
+          name: "{{ project }}_{{ domain }}_{{ region }}"
+        register: resourcegroup_by_name
+        when: project is defined and domain is defined
+
+      - name: AZURE RESOURCE GROUP OVERLAY | setting vpc facts
+        set_fact:
+          specified_resourcegroup: "{{ resourcegroup_by_name.ansible_facts.azure_resourcegroups.0 }}"
+        when: resourcegroup_by_name.ansible_facts.azure_resourcegroups.0 is defined
+
+      - name: AZURE RESOURCE GROUP OVERLAY | retrieving facts for {{ project }}_{{ domain }} virtual network
+        azure_rm_virtualnetwork_facts:
+          resource_group: "{{ specified_resourcegroup.name }}"
+          name: "{{ project }}_{{ domain }}_vnet"
+        register: virtualnetwork_by_name
+        when: project is defined and domain is defined
+
+      - name: AZURE RESOURCE GROUP OVERLAY | setting internal private subnet
+        set_fact:
+          internal_private_subnet_result: "{{ virtualnetwork_by_name.ansible_facts.azure_virtualnetworks.0.properties.subnets.0 }}"
+
+      - name: CORE AZURE RESOURCE GROUP | setting internal public subnet
+        set_fact:
+          internal_public_subnet_result: "{{ virtualnetwork_by_name.ansible_facts.azure_virtualnetworks.0.properties.subnets.1 }}"
+          
+      - name: AZURE INVENTORY OVERLAY | setting key_path
+        set_fact: key_path="{{ key_path | default(playbook_dir) }}"
+
+      # non-jumphosts have private interface on eth0
+      - name: AZURE INVENTORY OVERLAY | discovering postgresql internal interfaces
+        azure_rm_networkinterface_facts:
+          resource_group: "{{ specified_resourcegroup.name }}"
+#          name: "{{ project }}_postgresql_none_{{ cluster }}_{{ dataflow }}_{{ item }}_internal"    
+          tags:
+            - Application:postgresql
+            - Tenant:{{ tenant }}
+            - Project:{{ project }}
+            - Domain:{{ domain }}
+        with_sequence: count={{ count | default(1) }}  
+        register: all_vms
+      
+      - name: AZURE INVENTORY OVERLAY | adding all discovered hosts to postgresql host group
+        add_host: hostname="{{ item.ansible_facts.azure_networkinterfaces.0.properties.ipConfigurations.0.properties.privateIPAddress }}" groupname=postgresql ansible_user="{{ user }}" ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
+        when: item.ansible_facts.azure_networkinterfaces | length > 0
+        with_items: "{{ all_vms.results }}"
+          
+      when:
+        - cloud == 'azure'
 
 - name: POSTGRESQL TUNING OVERLAY | tuning all postgresql instances
   hosts: postgresql
@@ -151,7 +205,7 @@
           path: "{{ postgresql_config_path }}/postgresql.conf"
           regexp: '^#effective_io_concurrency = 1'
           line: "effective_io_concurrency = 2           # 1-1000; 0 disables prefetching"
-        backrefs: yes
+          backrefs: yes
         become_user: "{{ postgresql_user }}"
     
       - name: POSTGRESQL TUNING OVERLAY | restarting postgresql

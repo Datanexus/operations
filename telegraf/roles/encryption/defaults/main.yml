@@ -1,0 +1,11 @@
+broker:
+  config:
+    sslPort: '9091'
+telegraf:
+  enabled: yes
+  user: telegraf
+  group: telegraf
+  config_file: /etc/telegraf/telegraf.conf
+  service_name: telegraf
+  config:
+    output_format: json

@@ -47,7 +47,7 @@
           - cloud == 'aws'
 
       - name: DATANEXUS DEMO OVERLAY | building cassandra host group
-        add_host: hostname="{{ item }}" groupname="cassandra" ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-cassandra-{{ domain }}-private-key.pem"
+        add_host: hostname="{{ item }}" groupname="cassandra" ansible_ssh_private_key_file="{{ key_path | default(playbook_dir) }}/{{ cloud }}-{{ region }}-{{ project }}-cassandra-{{ domain }}-private-key.pem"
         with_items: "{{ cassandra_instances.instances | map(attribute='private_ip_address') | list }}"
         when:
           - cassandra_instances.instances|length > 0
@@ -66,7 +66,7 @@
   hosts: localhost
   tasks:
     - name: DATANEXUS DEMO OVERLAY | building cassandra public internal host group
-      add_host: hostname="{{ hostvars[item].ansible_eth1.ipv4.address }}" groupname=cassandra_public ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-cassandra-{{ domain }}-private-key.pem"
+      add_host: hostname="{{ hostvars[item].ansible_eth1.ipv4.address }}" groupname=cassandra_public ansible_ssh_private_key_file="{{ key_path | default(playbook_dir) }}/{{ cloud }}-{{ region }}-{{ project }}-cassandra-{{ domain }}-private-key.pem"
       with_items: "{{ groups['cassandra'] }}"
       run_once: true
       
@@ -86,7 +86,7 @@
         register: postgresql_instances
       
       - name: DATANEXUS DEMO OVERLAY | building postgresql source host group
-        add_host: hostname="{{ item }}" groupname=postgresql ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
+        add_host: hostname="{{ item }}" groupname=postgresql ansible_ssh_private_key_file="{{ key_path | default(playbook_dir) }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
         with_items: "{{ postgresql_instances.instances | map(attribute='private_ip_address') | list }}"
         when:
           - postgresql_instances is defined
@@ -111,7 +111,7 @@
         register: postgresql_instances
       
       - name: DATANEXUS DEMO OVERLAY | building postgresql source host group
-        add_host: hostname="{{ item }}" groupname=postgresql_source ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
+        add_host: hostname="{{ item }}" groupname=postgresql_source ansible_ssh_private_key_file="{{ key_path | default(playbook_dir) }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
         with_items: "{{ postgresql_instances.instances | map(attribute='private_ip_address') | list }}"
         when:
           - postgresql_instances is defined
@@ -136,7 +136,7 @@
         register: postgresql_instances
       
       - name: DATANEXUS DEMO OVERLAY | building postgresql sink host group
-        add_host: hostname="{{ item }}" groupname=postgresql_sink ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
+        add_host: hostname="{{ item }}" groupname=postgresql_sink ansible_ssh_private_key_file="{{ key_path | default(playbook_dir) }}/{{ cloud }}-{{ region }}-{{ project }}-postgresql-{{ domain }}-private-key.pem"
         with_items: "{{ postgresql_instances.instances | map(attribute='private_ip_address') | list }}"
         when:
           - postgresql_instances is defined
@@ -169,7 +169,7 @@
           - cloud == 'aws'
 
       - name: DATANEXUS DEMO OVERLAY | building kafka host group
-        add_host: hostname="{{ item }}" groupname=kafka ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-kafka-{{ domain }}-private-key.pem"
+        add_host: hostname="{{ item }}" groupname=kafka ansible_ssh_private_key_file="{{ key_path | default(playbook_dir) }}/{{ cloud }}-{{ region }}-{{ project }}-kafka-{{ domain }}-private-key.pem"
         with_items: "{{ kafka_instances.instances|map(attribute='private_ip_address')|list }}"
         when:
           - kafka_instances.instances|length > 0
@@ -188,7 +188,7 @@
   hosts: localhost
   tasks:
     - name: DATANEXUS DEMO OVERLAY | building kafka public internal host group
-      add_host: hostname="{{ hostvars[item].ansible_eth1.ipv4.address }}" groupname=kafka_public ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-kafka-{{ domain }}-private-key.pem"
+      add_host: hostname="{{ hostvars[item].ansible_eth1.ipv4.address }}" groupname=kafka_public ansible_ssh_private_key_file="{{ key_path | default(playbook_dir) }}/{{ cloud }}-{{ region }}-{{ project }}-kafka-{{ domain }}-private-key.pem"
       with_items: "{{ groups['kafka'] }}"
         
 # there has to be a better way to gather the eth1 IP address; wtb cloud agnostic inventory system

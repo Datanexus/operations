@@ -48,7 +48,7 @@
   
   # insure_skip_verify set to true per https://sematext.com/opensee/m/InfluxDB/F4bYuyXWvm1U2FVY1?subj=+InfluxData+Community+Collect+Telegraf+Kafka+output+SSL+questions
   # is there a problem with the self-signed chain?
-  - name: TELEGRAF OVERLAY (KAFKA) | enabling and configuring kafka output
+  - name: TELEGRAF OVERLAY (TELEGRAF) | enabling and configuring kafka output
     blockinfile:
       path: "{{ telegraf.config_file }}"
       marker: "# datanexus kafka output {mark} ANSIBLE MANAGED BLOCK"
@@ -72,7 +72,6 @@
           ##   ex: version = "1.1.0"
           # version = ""
 
-          
           ## Telegraf tag to use as a routing key
           ##  ie, if this tag exists, its value will be used as the routing key
           routing_tag = "host"
@@ -131,7 +130,7 @@
           ## Each data format has its own unique set of configuration options, read
           ## more about them here:
           ## https://github.com/influxdata/telegraf/blob/master/docs/DATA_FORMATS_OUTPUT.md
-          data_format = "influx"
+          data_format = "{{ output_format | default(telegraf.config.output_format) }}"
           
           ## Optional topic suffix configuration.
           ## If the section is omitted, no suffix is used.
@@ -159,7 +158,6 @@
           #   method = "tags"
           #   keys = ["foo", "bar"]
           #   separator = "_"
-          
     notify: restart telegraf
       
   become: true

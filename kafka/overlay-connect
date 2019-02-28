@@ -75,9 +75,10 @@
       add_host: hostname="{{ hostvars[item].ansible_eth1.ipv4.address }}" groupname=connect_public
       with_items: "{{ groups['kafka_connect'] }}"
       when: "'kafka_connect' in groups | default([])"
-      
+
+# since we run distributed connectors, we only need register on a single host
 - name: CONFLUENT CONNECTOR OVERLAY | configuring connectors
-  hosts: kafka_connect
+  hosts: kafka_connect[0]
   vars_files:
     - vars/connect.yml
   gather_facts: yes

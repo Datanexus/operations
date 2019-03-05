@@ -48,18 +48,18 @@ connect:
 #           schema.ignore: true
 #           schemas.enable: false
 #           key.converter: org.apache.kafka.connect.storage.StringConverter
-#       - name: es_diskio_sink
-#         config:
-#           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
-#           tasks.max: 1
-#           topics: telegraf_diskio
-#           topic.index.map: telegraf_diskio:diskio_index
-#           connection.url: "http://{{ groups['elasticsearch_public'] | first }}:{{ elasticsearch.config.restPort }}"
-#           type.name: true
-#           key.ignore: true
-#           schema.ignore: true
-#           schemas.enable: false
-#           key.converter: org.apache.kafka.connect.storage.StringConverter
+      - name: es_diskio_sink
+        config:
+          connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
+          tasks.max: 1
+          topics: telegraf_diskio
+          topic.index.map: telegraf_diskio:diskio_index
+          connection.url: "http://{{ groups['elasticsearch_public'] | first }}:{{ elasticsearch.config.restPort }}"
+          type.name: true
+          key.ignore: true
+          schema.ignore: true
+          schemas.enable: false
+          key.converter: org.apache.kafka.connect.storage.StringConverter
 #       - name: es_kernel_sink
 #         config:
 #           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
@@ -72,30 +72,30 @@ connect:
 #           schema.ignore: true
 #           schemas.enable: false
 #           key.converter: org.apache.kafka.connect.storage.StringConverter
-#       - name: es_mem_sink
-#         config:
-#           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
-#           tasks.max: 1
-#           topics: telegraf_mem
-#           topic.index.map: telegraf_mem:mem_index
-#           connection.url: "http://{{ groups['elasticsearch_public'] | first }}:{{ elasticsearch.config.restPort }}"
-#           type.name: true
-#           key.ignore: true
-#           schema.ignore: true
-#           schemas.enable: false
-#           key.converter: org.apache.kafka.connect.storage.StringConverter
-#       - name: es_processes_sink
-#         config:
-#           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
-#           tasks.max: 1
-#           topics: telegraf_processes
-#           topic.index.map: telegraf_processes:processes_index
-#           connection.url: "http://{{ groups['elasticsearch_public'] | first }}:{{ elasticsearch.config.restPort }}"
-#           type.name: true
-#           key.ignore: true
-#           schema.ignore: true
-#           schemas.enable: false
-#           key.converter: org.apache.kafka.connect.storage.StringConverter
+      - name: es_mem_sink
+        config:
+          connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
+          tasks.max: 1
+          topics: telegraf_mem
+          topic.index.map: telegraf_mem:mem_index
+          connection.url: "http://{{ groups['elasticsearch_public'] | first }}:{{ elasticsearch.config.restPort }}"
+          type.name: true
+          key.ignore: true
+          schema.ignore: true
+          schemas.enable: false
+          key.converter: org.apache.kafka.connect.storage.StringConverter
+      - name: es_processes_sink
+        config:
+          connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
+          tasks.max: 1
+          topics: telegraf_processes
+          topic.index.map: telegraf_processes:processes_index
+          connection.url: "http://{{ groups['elasticsearch_public'] | first }}:{{ elasticsearch.config.restPort }}"
+          type.name: true
+          key.ignore: true
+          schema.ignore: true
+          schemas.enable: false
+          key.converter: org.apache.kafka.connect.storage.StringConverter
 #       - name: es_swap_sink
 #         config:
 #           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector

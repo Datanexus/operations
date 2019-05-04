@@ -1,4 +1,5 @@
 # (c) 2016 DataNexus Inc.  All Rights Reserved.
+# Licensed software not for distribution
 #
 # enable broker encryption
 ---
@@ -31,12 +32,13 @@
       - "{{ key_path }}/kafka.client.keystore.jks"
       - "{{ key_path }}/kafka.client.truststore.jks"  
     notify: restart kafkarest
-    
+  
+  # cap number of brokers in config at 5
   - name: ENCRYPTION OVERLAY (REST PROXY) | configuring bootstrap servers
     lineinfile:
       path: "{{ kafkarest.config_file }}"
       regexp: '^bootstrap.servers='
-      line: "bootstrap.servers=SSL://{{ groups['kafka_public'] | join(':' + broker.config.sslPort + ',SSL://') }}:{{ broker.config.sslPort }}"
+      line: "bootstrap.servers=SSL://{{ groups['kafka_public'][:5] | join(':' + broker.config.sslPort + ',SSL://') }}:{{ broker.config.sslPort }}"
     notify: restart kafkarest
   
   # SSL to the listener is not currently available
@@ -68,7 +70,7 @@
       insertafter: EOF
       state: present
       block: |
-        client.bootstrap.servers={{ groups['kafka_public'] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}"
+        client.bootstrap.servers={{ groups['kafka_public'][:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}"
         client.security.protocol=SSL
         client.ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
         client.ssl.truststore.password={{ storepass }}

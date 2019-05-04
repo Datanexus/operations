@@ -1,4 +1,5 @@
 # (c) 2016 DataNexus Inc.  All Rights Reserved.
+# Licensed software not for distribution
 #
 # application specific stores
 ---
@@ -168,7 +169,7 @@
   
   - name: ENCRYPTION OVERLAY (CA) | fetching ca broker files
     fetch:
-      src: "/etc/tls/datanexus/{{ broker.application }}/{{ item }}"
+      src: "/etc/tls/{{ tenant }}/{{ broker.application }}/{{ item }}"
       dest: "{{ key_path }}/{{ item }}"
       flat: yes
     with_items:
@@ -178,7 +179,7 @@
   
   - name: ENCRYPTION OVERLAY (TELEGRAF) | fetching unencrypted key
     fetch:
-      src: "/etc/tls/datanexus/{{ telegraf.service_name }}/{{ item }}"
+      src: "/etc/tls/{{ tenant }}/{{ telegraf.service_name }}/{{ item }}"
       dest: "{{ key_path }}/{{ item }}"
       flat: yes
     with_items:

@@ -1,8 +1,11 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+# Licensed software not for distribution
 broker:
   application: kafka_broker
   user: cp-kafka
   group: confluent
   service_name: confluent-kafka
+  user_service: /usr/local/bin
   config_file: /etc/kafka/server.properties
   config:
     port: '9092'
@@ -15,6 +18,7 @@ connect:
   distributed:
     config_file: /etc/kafka/connect-distributed.properties
     service_name: confluent-kafka-connect
+    user_service: /usr/local/bin
     user: cp-kafka-connect
     group: confluent
 schema:
@@ -23,6 +27,7 @@ schema:
     group: confluent
     config_file: /etc/schema-registry/schema-registry.properties
     service_name: confluent-schema-registry
+    user_service: /usr/local/bin
     config:
       listener_port: '8081'
 control:
@@ -31,9 +36,11 @@ control:
     group: confluent
     config_file: /etc/confluent-control-center/control-center-production.properties
     service_name: confluent-control-center
+    user_service: /usr/local/bin
 ksql:
   config_file: /etc/ksql/ksql-server.properties
   service_name: confluent-ksql
+  user_service: /usr/local/bin
   user: cp-ksql
   group: confluent
 kafkarest:
@@ -41,6 +48,7 @@ kafkarest:
   group: confluent
   config_file: /etc/kafka-rest/kafka-rest.properties
   service_name: confluent-kafka-rest
+  user_service: /usr/local/bin
   config:
     rest_port: 8082
 telegraf:

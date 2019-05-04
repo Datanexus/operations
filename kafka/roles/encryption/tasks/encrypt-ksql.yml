@@ -1,4 +1,5 @@
 # (c) 2016 DataNexus Inc.  All Rights Reserved.
+# Licensed software not for distribution
 #
 # enable broker encryption
 ---
@@ -30,11 +31,12 @@
       - "{{ key_path }}/kafka.client.truststore.jks"
     notify: restart ksql
   
+  # cap number of brokers in config at 5
   - name: ENCRYPTION OVERLAY (KSQL) | configuring bootstrap servers
     lineinfile:
       path: "{{ ksql.config_file }}"
       regexp: '^bootstrap.servers='
-      line: "bootstrap.servers={{ groups['kafka_public'] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}"
+      line: "bootstrap.servers={{ groups['kafka_public'][:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}"
       insertafter: '^#bootstrap.servers='
     notify: restart ksql
   
@@ -61,6 +63,6 @@
         ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
         ssl.keystore.password={{ storepass }}
         ssl.key.password={{ keypass }}
-    notify: restart broker
+    notify: restart ksql
       
   become: true

@@ -1,5 +1,6 @@
 #!/usr/bin/env ansible-playbook
 # (c) 2016 DataNexus Inc.  All Rights Reserved.
+# Licensed software not for distribution
 #
 # overlay broker-to-broker, client-to-broker encryption over top of an existing kafka cluster
 # https://www.confluent.io/blog/apache-kafka-security-authorization-authentication-encryption/
@@ -13,17 +14,17 @@
         region: "{{ region }}"
         filters:
           instance-state-name: running
-          "tag:Application": kafka-broker
+          "tag:Application": kafka_broker
           "tag:Domain": "{{ domain }}"
           "tag:Project": "{{ project }}"
           "tag:Tenant": "{{ tenant }}"
       register: kafka_instances
       when:
-        - groups['kafka-broker'] is not defined
+        - groups['kafka_broker'] is not defined
         - cloud == 'aws'
     
     - name: ENCRYPTION OVERLAY (TELEGRAF) | building kafka broker host group
-      add_host: hostname="{{ item }}" groupname=kafka-broker ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-{{ broker.application }}-{{ domain }}-private-key.pem"
+      add_host: hostname="{{ item }}" groupname=kafka_broker ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-{{ broker.application }}-{{ domain }}-private-key.pem"
       with_items: "{{ kafka_instances.instances|map(attribute='private_ip_address')|list }}"
       when:
         - kafka_instances.instances is defined
@@ -56,7 +57,7 @@
   vars:
     # this is semi clever; application gets set based on each host group
     application: "{{ group_names | first }}"
-  gather_facts: no
+  gather_facts: yes
   tasks:
     - include_role:
         name: encryption

@@ -1,44 +1,131 @@
-# (c) Copyright 2018 DataNexus Inc.  All Rights Reserved.
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+# Licensed software not for distribution
 #
 # handlers used during confluent platform installation
 ---
 - name: reload systemd
   command: systemctl daemon-reload
-  become: true
-  
-- name: restart broker
+  become: yes
+  when: 
+    - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - ansible_distribution_version is version_compare('7', '>=')
+    
+- name: systemd broker
+  listen: "restart broker"
   systemd:
     name: "{{ broker.service_name }}"
     state: restarted
-  become: true
+  become: yes
+  when: 
+    - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - ansible_distribution_version is version_compare('7', '>=')
 
-- name: restart registry 
+- name: sysvinit broker
+  listen: "restart broker"
+  sysvinit:
+    name: "{{ broker.service_name }}"
+    state: restarted
+  become: yes
+  when: 
+    - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - ansible_distribution_version is version_compare('7', '<')
+
+- name: systemd registry
+  listen: "restart registry"
   systemd:
     name: "{{ schema.registry.service_name }}"
     state: restarted
-  become: true
+  become: yes
+  when:
+    - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - ansible_distribution_version is version_compare('7', '>=')
 
-# this can sometimes take a few minutes
-- name: restart controlcenter
+- name: sysvinit registry
+  listen: "restart registry"
+  sysvinit:
+    name: "{{ schema.registry.service_name }}"
+    state: restarted
+  become: yes
+  when:
+    - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - ansible_distribution_version is version_compare('7', '<')
+
+- name: systemd controlcenter
+  listen: "restart controlcenter"
   systemd:
     name: "{{ control.center.service_name }}"
     state: restarted
-  become: true
-  
-- name: restart connect
-  systemd:
-    name: "{{ connect.distributed.service_name }}"
+  become: yes
+  when:
+    - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - ansible_distribution_version is version_compare('7', '>=')
+
+- name: sysvinit controlcenter
+  listen: "restart controlcenter"
+  sysvinit:
+    name: "{{ control.center.service_name }}"
     state: restarted
   become: yes
+  when:
+    - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - ansible_distribution_version is version_compare('7', '<')
 
-- name: restart ksql
+- name: systemd connect
+  listen: "restart connect"
+  systemd:
+    name: "{{ connect.distributed.service_name  }}"
+    state: restarted
+  become: yes
+  when:
+    - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - ansible_distribution_version is version_compare('7', '>=')
+
+- name: sysvinit connect
+  listen: "restart connect"
+  sysvinit:
+    name: "{{ connect.distributed.service_name  }}"
+    state: restarted
+  become: yes
+  when:
+    - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - ansible_distribution_version is version_compare('7', '<')
+
+- name: systemd ksql
+  listen: "restart ksql"
   systemd:
     name: "{{ ksql.service_name }}"
     state: restarted
-  become: true
+  become: yes
+  when:
+    - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - ansible_distribution_version is version_compare('7', '>=')
 
-- name: restart kafkarest
+- name: sysvinit ksql
+  listen: "restart ksql"
+  sysvinit:
+    name: "{{ ksql.service_name }}"
+    state: restarted
+  become: yes
+  when:
+    - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - ansible_distribution_version is version_compare('7', '<')
+
+- name: systemd kafkarest
+  listen: "restart kafkarest"
   systemd:
     name: "{{ kafkarest.service_name }}"
     state: restarted
-  become: true
+  become: yes
+  when:
+    - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - ansible_distribution_version is version_compare('7', '>=')
+
+- name: sysvinit kafkarest
+  listen: "restart kafkarest"
+  sysvinit:
+    name: "{{ kafkarest.service_name }}"
+    state: restarted
+  become: yes
+  when:
+    - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - ansible_distribution_version is version_compare('7', '<')

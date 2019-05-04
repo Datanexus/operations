@@ -1,4 +1,5 @@
 # (c) 2016 DataNexus Inc.  All Rights Reserved.
+# Licensed software not for distribution
 #
 # enable telagraf to broker encryption
 ---
@@ -58,7 +59,7 @@
         # Configuration for the Kafka server to send metrics to
         [[outputs.kafka]]
           ## URLs of kafka brokers
-          brokers = ["{{ groups['kafka_public'] | join(':' + broker.config.sslPort + '","') }}:{{ broker.config.sslPort }}"]
+          brokers = ["{{ groups['kafka_public'][:5] | join(':' + broker.config.sslPort + '","') }}:{{ broker.config.sslPort }}"]
         
           ## Kafka topic for producer messages
           topic = "telegraf"

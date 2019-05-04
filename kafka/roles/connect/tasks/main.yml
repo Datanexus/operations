@@ -1,4 +1,5 @@
-# (c) Copyright 2018 DataNexus Inc.  All Rights Reserved.
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+# Licensed software not for distribution
 #
 #
 ---
@@ -18,7 +19,9 @@
       method: GET
       status_code: 200
     register: active_connectors
-  
+    when:
+      - groups['connect_public'] | length > 0
+      
   # only POST a new connector if the name is unique
   - name: CONFLUENT OVERLAY (BROKER) | creating connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
     uri:
@@ -30,7 +33,9 @@
     loop: "{{ all_connectors }}"
     loop_control:
       loop_var: item
-    when: not item.name in active_connectors.json
+    when:
+      - groups['connect_public'] | length > 0
+      - not item.name in active_connectors.json
     
   # - name: CONFLUENT OVERLAY (BROKER) | updating elasticsearch sink
 #     uri:

@@ -1,4 +1,5 @@
 # (c) 2016 DataNexus Inc.  All Rights Reserved.
+# Licensed software not for distribution
 #
 # broker client
 ---
@@ -69,7 +70,7 @@
     
   - name: ENCRYPTION OVERLAY (CLIENT) | fetching client stores
     fetch:
-      src: /etc/tls/datanexus/{{ broker.application }}/{{ item }}
+      src: /etc/tls/{{ tenant }}/{{ broker.application }}/{{ item }}
       dest: "{{ key_path }}/{{ item }}"
       flat: yes
     with_items:
@@ -78,7 +79,7 @@
   
   - name: ENCRYPTION OVERLAY (TELEGRAF) | fetching client cert
     fetch:
-      src: /etc/tls/datanexus/{{ telegraf.service_name }}/{{ item }}
+      src: /etc/tls/{{ tenant }}/{{ telegraf.service_name }}/{{ item }}
       dest: "{{ key_path }}/{{ item }}"
       flat: yes
     with_items:

@@ -1,13 +1,24 @@
-# (c) Copyright 2018 DataNexus Inc.  All Rights Reserved.
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+# Licensed software not for distribution
 #
 # handlers used during telegraf installation
----  
-- name: reload systemd
-  command: systemctl daemon-reload
-  become: true
-
-- name: restart telegraf
+---
+- name: systemd telegraf
+  listen: "restart telegraf"
   systemd:
     name: "{{ telegraf.service_name }}" 
     state: restarted
-  become: true
+  become: yes
+  when:
+     - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+     - ansible_distribution_version is version_compare('7', '>=')
+
+- name: sysvinit telegraf
+  listen: "restart telegraf"
+  sysvinit:
+    name: "{{ telegraf.service_name }}" 
+    state: restarted
+  become: yes
+  when:
+    - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - ansible_distribution_version is version_compare('7', '<')

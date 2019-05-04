@@ -1,5 +1,6 @@
 #!/bin/sh
-# (c) Copyright 2016 DataNexus Inc.  All Rights Reserved.
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+# Licensed software not for distribution
 
 if [ "$1" = "-h" ] ; then
   printf "Usage:  consume-topic [-h]\\thelp\\n"
@@ -14,7 +15,7 @@ elif [ $# -eq 1 ]; then
 fi
 
 # we want to verify the topic exists before we consume it
-/usr/local/bin/list-topics | /usr/bin/grep $1 &> /dev/null
+/usr/local/bin/list-topics | grep $1 &> /dev/null
  if [ $? == 0 ]; then
    /usr/bin/kafka-console-consumer --bootstrap-server $BROKER_HOSTS --topic $1 --from-beginning --consumer.config /etc/tls/{{ tenant }}/{{ broker.application }}/client-ssl.properties
  else

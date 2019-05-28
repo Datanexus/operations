@@ -1,8 +1,0 @@
-# (c) 2018 DataNexus Inc.  All Rights Reserved.
----
-# when this is set all certificates will be regenerated each run
-regenerate_certs: yes
-# telegraf is enabled by default
-# using_telegraf: no
-# remove intermediate and downloaded files
-cleanup: no

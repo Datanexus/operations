@@ -7,7 +7,7 @@
   
   - name: ENCRYPTION OVERLAY (CLIENT) | removing existing {{ broker.application }} credentials 
     file:
-      path: /etc/tls/{{ tenant }}/{{ broker.application }}/{{ item }}
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/{{ item }}"
       state: absent
     with_items:
       - kafka.client.truststore.jks
@@ -18,7 +18,7 @@
   
   - name: ENCRYPTION OVERLAY (TELEGRAF) | removing existing {{ telegraf.service_name}} credentials 
     file:
-      path: /etc/tls/{{ tenant }}/{{ telegraf.service_name}}/{{ item }}
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name}}/{{ item }}"
       state: absent
     with_items:
       - client-key
@@ -27,50 +27,50 @@
   
   - name: ENCRYPTION OVERLAY (CLIENT) | checking existing client truststore
     stat:
-      path: "/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks"
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks"
     register: kafka_client_trust
 
   - name: ENCRYPTION OVERLAY (CLIENT) | importing CA certificate into client truststore
-    command: /usr/bin/keytool -keystore /etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks -alias CARoot -import -file /etc/tls/{{ tenant }}/{{ broker.application }}/ca-cert -storepass {{ storepass }} -keypass {{ keypass }} -noprompt
+    command: /usr/bin/keytool -keystore {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks -alias CARoot -import -file {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/ca-cert -storepass {{ storepass }} -keypass {{ keypass }} -noprompt
     when: not kafka_client_trust.stat.exists
   
   - name: ENCRYPTION OVERLAY (CLIENT) | checking existing client keystore
     stat:
-      path: "/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks"
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks"
     register: kafka_client_key
     
   - name: ENCRYPTION OVERLAY (CLIENT) | generating client keystore
-    command: /usr/bin/keytool -keystore /etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks -alias localhost -validity {{ duration }} -genkey -keyalg RSA -storepass {{ storepass }} -keypass {{ keypass }} -dname "CN={{ certs.CN }}, OU={{ certs.OU }}, O={{ certs.O }}, L={{ certs.L }}, C={{ certs.C }}"
+    command: /usr/bin/keytool -keystore {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks -alias localhost -validity {{ duration }} -genkey -keyalg RSA -storepass {{ storepass }} -keypass {{ keypass }} -dname "CN={{ certs.CN }}, OU={{ certs.OU }}, O={{ certs.O }}, L={{ certs.L }}, C={{ certs.C }}"
     when: not kafka_client_key.stat.exists
     
   - name: ENCRYPTION OVERLAY (CLIENT) | exporting unsigned client certificate from client keystore
-    command: /usr/bin/keytool -keystore /etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks -alias localhost -certreq -file /etc/tls/{{ tenant }}/{{ broker.application }}/unsigned-client-cert -storepass {{ storepass }}
+    command: /usr/bin/keytool -keystore {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks -alias localhost -certreq -file {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/unsigned-client-cert -storepass {{ storepass }}
 
   - name: ENCRYPTION OVERLAY (CLIENT) | signing client certificate with CA private key
-    command: /usr/bin/openssl x509 -extfile /etc/tls/{{ tenant }}/{{ broker.application }}/openssl.cnf -extensions v3_ca -req -CA /etc/tls/{{ tenant }}/{{ broker.application }}/ca-cert -CAkey /etc/tls/{{ tenant }}/{{ broker.application }}/ca-key -in /etc/tls/{{ tenant }}/{{ broker.application }}/unsigned-client-cert -out /etc/tls/{{ tenant }}/{{ broker.application }}/signed-client-cert -days {{ duration }} -CAcreateserial -passin pass:{{ keypass }}
+    command: /usr/bin/openssl x509 -extfile {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/openssl.cnf -extensions v3_ca -req -CA {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/ca-cert -CAkey {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/ca-key -in {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/unsigned-client-cert -out {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/signed-client-cert -days {{ duration }} -CAcreateserial -passin pass:{{ keypass }}
 
   - name: ENCRYPTION OVERLAY (CLIENT) | importing CA certificate into client keystore
-    command: /usr/bin/keytool -keystore /etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks -alias CARoot -import -file /etc/tls/{{ tenant }}/{{ broker.application }}/ca-cert -storepass {{ storepass }} -noprompt
+    command: /usr/bin/keytool -keystore {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks -alias CARoot -import -file {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/ca-cert -storepass {{ storepass }} -noprompt
     when: not kafka_client_key.stat.exists
 
   - name: ENCRYPTION OVERLAY (CLIENT) | importing signed certifcate into client keystore
-    command: /usr/bin/keytool -keystore /etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks -alias localhost -import -file /etc/tls/{{ tenant }}/{{ broker.application }}/signed-client-cert -storepass {{ storepass }} -noprompt
+    command: /usr/bin/keytool -keystore {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks -alias localhost -import -file {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/signed-client-cert -storepass {{ storepass }} -noprompt
     when: not kafka_client_key.stat.exists
   
   - name: ENCRYPTION OVERLAY (TELEGRAF) | checking existing {{ telegraf.service_name }} client-cert
     stat:
-      path: "/etc/tls/{{ tenant }}/{{ telegraf.service_name }}/client-cert"
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name }}/client-cert"
     register: existing_client_cert
     
   - name: ENCRYPTION OVERLAY (TELEGRAF) | generating client private key and self-signed certificate
-    command: /usr/bin/openssl req -new -x509 -config /etc/tls/{{ tenant }}/{{ broker.application }}/openssl.cnf -extensions v3_ca -keyout /etc/tls/{{ tenant }}/{{ telegraf.service_name }}/client-key -out /etc/tls/{{ tenant }}/{{ telegraf.service_name }}/client-cert -days {{ duration }} -passout pass:{{ keypass }} -subj "/CN={{ hostvars[inventory_hostname].ansible_facts.fqdn }}/OU={{ certs.OU }}/O={{ certs.O }}/L={{ certs.L }}/C={{ certs.C }}"
+    command: /usr/bin/openssl req -new -x509 -config {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/openssl.cnf -extensions v3_ca -keyout {{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name }}/client-key -out {{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name }}/client-cert -days {{ duration }} -passout pass:{{ keypass }} -subj "/CN={{ hostvars[inventory_hostname].ansible_facts.fqdn }}/OU={{ certs.OU }}/O={{ certs.O }}/L={{ certs.L }}/C={{ certs.C }}"
     when: 
-      - using_telegraf | default (telegraf.enabled)
+      - telegraf.enabled
       - not existing_client_cert.stat.exists
     
   - name: ENCRYPTION OVERLAY (CLIENT) | fetching client stores
     fetch:
-      src: /etc/tls/{{ tenant }}/{{ broker.application }}/{{ item }}
+      src: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/{{ item }}"
       dest: "{{ key_path }}/{{ item }}"
       flat: yes
     with_items:
@@ -79,12 +79,12 @@
   
   - name: ENCRYPTION OVERLAY (TELEGRAF) | fetching client cert
     fetch:
-      src: /etc/tls/{{ tenant }}/{{ telegraf.service_name }}/{{ item }}
+      src: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name }}/{{ item }}"
       dest: "{{ key_path }}/{{ item }}"
       flat: yes
     with_items:
       - client-cert
     when:
-      - using_telegraf | default (telegraf.enabled)
+      - telegraf.enabled
       
-  become: true 
+  become: "{{ got_root | default('yes') }}" 

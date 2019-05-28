@@ -1,11 +1,19 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+# Licensed software not for distribution
+#
+# this duplicates a lot of the variables in the kafka platform defaults
+# while annoying to keep in sync, this is so operations can be a true separate overlay
+shaw:
+  config:
+    tls_path: "{{ (got_root | default('yes')) | ternary('/etc/tls', (datanexus_root + '/datanexus/tls')) }}"
 broker:
   config:
     sslPort: '9091'
 telegraf:
-  enabled: yes
-  user: telegraf
-  group: telegraf
-  config_file: /etc/telegraf/telegraf.conf
+  enabled: "{{ telegraf_enabled | default('yes') }}"
+  user: "{{ telegraf_user_override | default('telegraf') }}"
+  group: "{{ telegraf_user_override | default('telegraf') }}"
+  config_file: "{{ (got_root | default('yes')) | ternary('/etc/telegraf/telegraf.conf', (telegraf_config)) }}"
   service_name: telegraf
   config:
     output_format: json

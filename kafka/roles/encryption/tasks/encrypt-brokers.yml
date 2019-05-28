@@ -9,12 +9,12 @@
   
   - name: ENCRYPTION OVERLAY (BROKERS) | checking existing server keystore
     stat:
-      path: "/etc/tls/{{ tenant }}/{{ broker.application }}"
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
     register: kafka_server_key
   
   - name: ENCRYPTION OVERLAY (BROKERS) | ensure TLS kafka directory is present
     file:
-      path: /etc/tls/{{ tenant }}/{{ broker.application }}
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
       state: directory
       mode: 0755
       owner: "{{ broker.user }}"
@@ -24,7 +24,7 @@
   - name: ENCRYPTION OVERLAY (BROKERS) | distributing certificates to all cluster nodes
     copy:
       src: "{{ item }}"
-      dest: "/etc/tls/{{ tenant }}/{{ broker.application }}/"
+      dest: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/"
       owner: "{{ broker.user }}"
       group: "{{ broker.group }}"
       mode: 0600
@@ -57,10 +57,10 @@
         security.inter.broker.protocol=SSL
         ssl.protocol=TLSv1
         ssl.client.auth=required
-        ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.server.keystore.jks
+        ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.server.keystore.jks
         ssl.keystore.password={{ storepass }}
         ssl.key.password={{ keypass }}
-        ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.server.truststore.jks
+        ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.server.truststore.jks
         ssl.truststore.password={{ storepass }}
         ssl.enabled.protocols=TLSv1.2,TLSv1.1,TLSv1
         ssl.keystore.type=JKS
@@ -86,9 +86,9 @@
       state: present
       block: |
         confluent.metrics.reporter.security.protocol=SSL
-        confluent.metrics.reporter.ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.server.truststore.jks
+        confluent.metrics.reporter.ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.server.truststore.jks
         confluent.metrics.reporter.ssl.truststore.password={{ storepass }}
-        confluent.metrics.reporter.ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.server.keystore.jks
+        confluent.metrics.reporter.ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.server.keystore.jks
         confluent.metrics.reporter.ssl.keystore.password={{ storepass }}
         confluent.metrics.reporter.ssl.key.password={{ keypass }}
     when:
@@ -96,4 +96,4 @@
       - groups['controlcenter'] | length > 0
     notify: restart broker
   
-  become: true
+  become: "{{ got_root | default('yes') }}"

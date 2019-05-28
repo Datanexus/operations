@@ -7,12 +7,12 @@
   
   - name: ENCRYPTION OVERLAY (KSQL) | checking existing server keystore
     stat:
-      path: "/etc/tls/{{ tenant }}/{{ broker.application }}"
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
     register: kafka_server_key
   
   - name: ENCRYPTION OVERLAY (KSQL) | ensure TLS {{ broker.application }} directory is present
     file:
-      path: /etc/tls/{{ tenant }}/{{ broker.application }}
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
       state: directory
       mode: 0755
       owner: "{{ ksql.user }}"
@@ -22,7 +22,7 @@
   - name: ENCRYPTION OVERLAY (KSQL) | distributing certificates to connect node(s)
     copy:
       src: "{{ item }}"
-      dest: "/etc/tls/{{ tenant }}/{{ broker.application }}/"
+      dest: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/"
       owner: "{{ ksql.user }}"
       group: "{{ ksql.group }}"
       mode: 0600
@@ -58,11 +58,11 @@
       state: present
       block: |
         security.protocol=SSL
-        ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+        ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
         ssl.truststore.password={{ storepass }}
-        ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+        ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
         ssl.keystore.password={{ storepass }}
         ssl.key.password={{ keypass }}
     notify: restart ksql
       
-  become: true
+  become: "{{ got_root | default('yes') }}"

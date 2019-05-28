@@ -1,13 +1,23 @@
 # (c) 2016 DataNexus Inc.  All Rights Reserved.
+# Licensed software not for distribution
 #
-# install kafka cluster helper utilities
+# install/update kafka cluster helper utilities
 ---
+- set_fact:
+    apache_bin: "{{ apache.install_dir }}/kafka_{{ apache.packages.scala_version }}-{{ apache.packages.kafka_version }}/bin"
+    
+- set_fact:
+    dn_bin_path: "{{ (got_root | default('yes')) | ternary('/usr/bin', (confluent_root + '/confluent-' + confluent.packages.confluent_version + '.' + confluent.packages.minor_release.split('-')[0] + '/bin')) }}"
+
+- set_fact:
+    utils_path: "{{ (apache_kafka) | ternary(apache_bin, dn_bin_path) }}"
+
 - block:
 
   - name: ENCRYPTION OVERLAY (POSTFLIGHT) | installing updated kafka topic consume utility for encrypted brokers
     template:
       src: consume-topic.j2
-      dest: "{{ utilsDir | default (postflight.utilsDir) }}/consume-topic"
+      dest: "{{ postflight.utilsDir }}/consume-topic"
       mode: 0755
       owner: "{{ broker.user }}"
       group: "{{ broker.group }}"
@@ -15,4 +25,4 @@
       - groups['kafka_broker'] is defined
       - groups['kafka_broker'] | length > 0
       
-  become: true
+  become: "{{ got_root | default('yes') }}"

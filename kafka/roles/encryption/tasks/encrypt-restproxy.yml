@@ -9,12 +9,12 @@
   
   - name: ENCRYPTION OVERLAY (REST PROXY) | checking existing server keystore
     stat:
-      path: "/etc/tls/{{ tenant }}/{{ broker.application }}"
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
     register: kafka_server_key
   
   - name: ENCRYPTION OVERLAY (REST PROXY) | ensure TLS {{ broker.application }} directory is present
     file:
-      path: /etc/tls/{{ tenant }}/{{ broker.application }}
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
       state: directory
       mode: 0755
       owner: "{{ kafkarest.user }}"
@@ -24,7 +24,7 @@
   - name: ENCRYPTION OVERLAY (REST PROXY) | distributing certificates to control center node(s)
     copy:
       src: "{{ item }}"
-      dest: "/etc/tls/{{ tenant }}/{{ broker.application }}/"
+      dest: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/"
       owner: "{{ kafkarest.user }}"
       group: "{{ kafkarest.group }}"
       mode: 0600
@@ -56,9 +56,9 @@
       insertafter: EOF
       state: present
       block: |
-        ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+        ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
         ssl.truststore.password={{ storepass }}
-        ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+        ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
         ssl.keystore.password={{ storepass }}
         ssl.key.password={{ keypass }}
     notify: restart kafkarest
@@ -72,11 +72,11 @@
       block: |
         client.bootstrap.servers={{ groups['kafka_public'][:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}"
         client.security.protocol=SSL
-        client.ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+        client.ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
         client.ssl.truststore.password={{ storepass }}
-        client.ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+        client.ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
         client.ssl.keystore.password={{ storepass }}
         client.ssl.key.password={{ keypass }}
     notify: restart kafkarest
   
-  become: true
+  become: "{{ got_root | default('yes') }}"

@@ -6,38 +6,38 @@
 - block:
   
   # ensure TLS path is guaranteed readable to all users
-  - name: ENCRYPTION OVERLAY (TELEGRAF) | ensuring /etc/tls is accessible by all users
+  - name: ENCRYPTION OVERLAY (TELEGRAF) | ensuring {{ shaw.config.tls_path }} is accessible by all users
     file:
-      path: /etc/tls
+      path: "{{ shaw.config.tls_path }}"
       state: directory
       mode: 0755
   
   # ensure TLS path is guaranteed readable to all users
-  - name: ENCRYPTION OVERLAY (TELEGRAF) | ensuring /etc/tls/{{ tenant }} is accessible by all users
+  - name: ENCRYPTION OVERLAY (TELEGRAF) | ensuring {{ shaw.config.tls_path }}/{{ tenant }} is accessible by all users
     file:
-      path: /etc/tls/{{ tenant }}
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}"
       state: directory
       mode: 0755
     
   - name: ENCRYPTION OVERLAY (TELEGRAF) | checking existing TLS {{ telegraf.service_name }} path
     stat:
-      path: "/etc/tls/{{ tenant }}/{{ telegraf.service_name }}"
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name }}"
     register: telegraf_key
   
   # the certificate directory tenant path must always be readable by every process
   - name: ENCRYPTION OVERLAY (TELEGRAF) | ensure TLS {{ telegraf.service_name }} directory is present
     file:
-      path: /etc/tls/{{ tenant }}/{{ telegraf.service_name }}
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name }}"
       state: directory
       owner: "{{ telegraf.user }}"
       group: "{{ telegraf.group }}"
       mode: 0755
     when: not telegraf_key.stat.exists
-    
+  
   - name: ENCRYPTION OVERLAY (TELEGRAF) | distributing certificates to telegraf nodes
     copy:
       src: "{{ item }}"
-      dest: "/etc/tls/{{ tenant }}/{{ telegraf.service_name }}/"
+      dest: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name }}/"
       owner: "{{ telegraf.user }}"
       group: "{{ telegraf.group }}"
       mode: 0600
@@ -117,9 +117,9 @@
           # max_message_bytes = 1000000
 
           ## Optional TLS Config
-          tls_ca = "/etc/tls/{{ tenant }}/{{ telegraf.service_name }}/client-cert"
-          tls_cert = "/etc/tls/{{ tenant }}/{{ telegraf.service_name }}/ca-cert"
-          tls_key = "/etc/tls/{{ tenant }}/{{ telegraf.service_name }}/ca-key.unec"
+          tls_ca = "{{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name }}/client-cert"
+          tls_cert = "{{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name }}/ca-cert"
+          tls_key = "{{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name }}/ca-key.unec"
           ## Use TLS but skip chain & host verification
           insecure_skip_verify = true
 
@@ -161,4 +161,4 @@
           #   separator = "_"
     notify: restart telegraf
       
-  become: true
+  become: yes

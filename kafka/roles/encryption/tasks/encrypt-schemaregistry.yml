@@ -7,12 +7,12 @@
   
   - name: ENCRYPTION OVERLAY (SCHEMA REGISTRY) | checking existing server keystore
     stat:
-      path: "/etc/tls/{{ tenant }}/{{ broker.application }}"
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
     register: kafka_server_key
   
   - name: ENCRYPTION OVERLAY (SCHEMA REGISTRY) | ensure TLS {{ broker.application }} directory is present
     file:
-      path: /etc/tls/{{ tenant }}/{{ broker.application }}
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
       state: directory
       mode: 0755
       owner: "{{ schema.registry.user }}"
@@ -22,7 +22,7 @@
   - name: ENCRYPTION OVERLAY (SCHEMA REGISTRY) | distributing certificates to control center node(s)
     copy:
       src: "{{ item }}"
-      dest: "/etc/tls/{{ tenant }}/{{ broker.application }}/"
+      dest: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/"
       owner: "{{ schema.registry.user }}"
       group: "{{ schema.registry.group }}"
       mode: 0600
@@ -53,11 +53,11 @@
       state: present
       block: |
         kafkastore.security.protocol=SSL
-        kafkastore.ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+        kafkastore.ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
         kafkastore.ssl.truststore.password={{ storepass }}
-        kafkastore.ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+        kafkastore.ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
         kafkastore.ssl.keystore.password={{ storepass }}
         kafkastore.ssl.key.password={{ keypass }}
     notify: restart registry
   
-  become: true
+  become: "{{ got_root | default('yes') }}"

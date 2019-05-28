@@ -7,6 +7,7 @@
   command: systemctl daemon-reload
   become: yes
   when: 
+    - got_root | default('yes')
     - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
     - ansible_distribution_version is version_compare('7', '>=')
     
@@ -16,7 +17,8 @@
     name: "{{ broker.service_name }}"
     state: restarted
   become: yes
-  when: 
+  when:
+    - got_root | default('yes')
     - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
     - ansible_distribution_version is version_compare('7', '>=')
 
@@ -26,10 +28,17 @@
     name: "{{ broker.service_name }}"
     state: restarted
   become: yes
-  when: 
+  when:
+    - got_root | default('yes')
     - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
     - ansible_distribution_version is version_compare('7', '<')
 
+- name: user broker
+  listen: "restart broker"
+  command: "{{ broker.user_service }}/broker restart"
+  when:
+    - not got_root
+    
 - name: systemd registry
   listen: "restart registry"
   systemd:
@@ -37,6 +46,7 @@
     state: restarted
   become: yes
   when:
+    - got_root | default('yes')
     - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
     - ansible_distribution_version is version_compare('7', '>=')
 
@@ -47,8 +57,15 @@
     state: restarted
   become: yes
   when:
+    - got_root | default('yes')
     - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
     - ansible_distribution_version is version_compare('7', '<')
+
+- name: user registry
+  listen: "restart registry"
+  command: "{{ schema.registry.user_service }}/confluent-schema-registry restart"
+  when:
+    - not got_root
 
 - name: systemd controlcenter
   listen: "restart controlcenter"
@@ -57,6 +74,7 @@
     state: restarted
   become: yes
   when:
+    - got_root | default('yes')
     - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
     - ansible_distribution_version is version_compare('7', '>=')
 
@@ -67,8 +85,15 @@
     state: restarted
   become: yes
   when:
+    - got_root | default('yes')
     - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
     - ansible_distribution_version is version_compare('7', '<')
+
+- name: user controlcenter
+  listen: "restart controlcenter"
+  command: "{{ control.center.user_service }}/confluent-control-center restart"
+  when:
+    - not got_root
 
 - name: systemd connect
   listen: "restart connect"
@@ -77,6 +102,7 @@
     state: restarted
   become: yes
   when:
+    - got_root | default('yes')
     - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
     - ansible_distribution_version is version_compare('7', '>=')
 
@@ -87,8 +113,15 @@
     state: restarted
   become: yes
   when:
+    - got_root | default('yes')
     - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
     - ansible_distribution_version is version_compare('7', '<')
+
+- name: user connect
+  listen: "restart connect"
+  command: "{{ connect.distributed.user_service }}/kafka-connect restart"
+  when:
+    - not got_root
 
 - name: systemd ksql
   listen: "restart ksql"
@@ -97,6 +130,7 @@
     state: restarted
   become: yes
   when:
+    - got_root | default('yes')
     - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
     - ansible_distribution_version is version_compare('7', '>=')
 
@@ -107,9 +141,16 @@
     state: restarted
   become: yes
   when:
+    - got_root | default('yes')
     - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
     - ansible_distribution_version is version_compare('7', '<')
 
+- name: user ksql
+  listen: "restart ksql"
+  command: "{{ ksql.user_service }}/confluent-ksql restart"
+  when:
+    - not got_root
+    
 - name: systemd kafkarest
   listen: "restart kafkarest"
   systemd:
@@ -117,6 +158,7 @@
     state: restarted
   become: yes
   when:
+    - got_root | default('yes')
     - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
     - ansible_distribution_version is version_compare('7', '>=')
 
@@ -127,5 +169,12 @@
     state: restarted
   become: yes
   when:
+    - got_root | default('yes')
     - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
     - ansible_distribution_version is version_compare('7', '<')
+
+- name: user kafkarest
+  listen: "restart kafkarest"
+  command: "{{ kafkarest.user_service }}/confluent-kafka-rest restart"
+  when:
+    - not got_root

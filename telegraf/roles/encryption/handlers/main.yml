@@ -10,8 +10,9 @@
     state: restarted
   become: yes
   when:
-     - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
-     - ansible_distribution_version is version_compare('7', '>=')
+    - got_root | default('yes')
+    - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - ansible_distribution_version is version_compare('7', '>=')
 
 - name: sysvinit telegraf
   listen: "restart telegraf"
@@ -20,5 +21,6 @@
     state: restarted
   become: yes
   when:
+    # - got_root | default('yes')
     - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
     - ansible_distribution_version is version_compare('7', '<')

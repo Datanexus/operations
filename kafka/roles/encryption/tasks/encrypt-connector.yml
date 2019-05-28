@@ -7,12 +7,12 @@
   
   - name: ENCRYPTION OVERLAY (CONNECTOR) | checking existing server keystore
     stat:
-      path: "/etc/tls/{{ tenant }}/{{ broker.application }}"
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
     register: kafka_server_key
   
   - name: ENCRYPTION OVERLAY (CONNECTOR) | ensure TLS {{ broker.application }} directory is present
     file:
-      path: /etc/tls/{{ tenant }}/{{ broker.application }}
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
       state: directory
       mode: 0755
       owner: "{{ connect.distributed.user }}"
@@ -22,7 +22,7 @@
   - name: ENCRYPTION OVERLAY (CONNECTOR) | distributing certificates to connect node(s)
     copy:
       src: "{{ item }}"
-      dest: "/etc/tls/{{ tenant }}/{{ broker.application }}/"
+      dest: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/"
       owner: "{{ connect.distributed.user }}"
       group: "{{ connect.distributed.group }}"
       mode: 0600
@@ -47,9 +47,9 @@
       state: present
       block: |
         security.protocol=SSL
-        ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+        ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
         ssl.truststore.password={{ storepass }}
-        ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+        ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
         ssl.keystore.password={{ storepass }}
         ssl.key.password={{ keypass }}
     notify: restart connect
@@ -63,9 +63,9 @@
       block: |
         producer.bootstrap.servers={{ groups['kafka_public'][:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}
         producer.security.protocol=SSL
-        producer.ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+        producer.ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
         producer.truststore.password={{ storepass }}
-        producer.ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+        producer.ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
         producer.ssl.keystore.password={{ storepass }}
         producer.ssl.key.password={{ keypass }}
     notify: restart connect
@@ -79,9 +79,9 @@
       block: |
         consumer.bootstrap.servers={{ groups['kafka_public'][:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}
         consumer.security.protocol=SSL
-        consumer.ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+        consumer.ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
         consumer.truststore.password={{ storepass }}
-        consumer.ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+        consumer.ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
         consumer.ssl.keystore.password={{ storepass }}
         consumer.ssl.key.password={{ keypass }}
     notify: restart connect
@@ -95,9 +95,9 @@
       block: |
         producer.confluent.monitoring.interceptor.bootstrap.servers={{ groups['kafka_public'][:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}
         producer.confluent.monitoring.interceptor.security.protocol=SSL
-        producer.confluent.monitoring.interceptor.ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+        producer.confluent.monitoring.interceptor.ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
         producer.confluent.monitoring.interceptor.ssl.truststore.password={{ storepass }}
-        producer.confluent.monitoring.interceptor.ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+        producer.confluent.monitoring.interceptor.ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
         producer.confluent.monitoring.interceptor.ssl.keystore.password={{ storepass }}
         producer.confluent.monitoring.interceptor.ssl.key.password={{ keypass }}
     notify: restart connect
@@ -111,11 +111,11 @@
       block: |
         consumer.confluent.monitoring.interceptor.bootstrap.servers={{ groups['kafka_public'][:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}
         consumer.confluent.monitoring.interceptor.security.protocol=SSL
-        consumer.confluent.monitoring.interceptor.ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+        consumer.confluent.monitoring.interceptor.ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
         consumer.confluent.monitoring.interceptor.ssl.truststore.password={{ storepass }}
-        consumer.confluent.monitoring.interceptor.ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+        consumer.confluent.monitoring.interceptor.ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
         consumer.confluent.monitoring.interceptor.ssl.keystore.password={{ storepass }}
         consumer.confluent.monitoring.interceptor.ssl.key.password={{ keypass }}
     notify: restart connect
   
-  become: true
+  become: "{{ got_root | default('yes') }}"

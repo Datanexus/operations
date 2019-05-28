@@ -51,9 +51,10 @@
 - name: ENCRYPTION OVERLAY (TELEGRAF) | configuring telegraf encryption
   hosts: all:!kafka_public
   vars_files:
-    - vars/encryption.yml
     - roles/encryption/defaults/main.yml
     - "{{ tenant_config_path }}/config/site.yml"
+    - "{{ tenant_config_path }}/config/applications/shaw.yml"
+    - "{{ tenant_config_path }}/config/applications/telegraf.yml"
   vars:
     # this is semi clever; application gets set based on each host group
     application: "{{ group_names | first }}"
@@ -62,4 +63,4 @@
     - include_role:
         name: encryption
         tasks_from: encrypt-telegraf
-      when: using_telegraf | default (telegraf.enabled)
+      when: telegraf.enabled

@@ -7,12 +7,12 @@
   
   - name: ENCRYPTION OVERLAY (CONTROL CENTER) | checking existing server keystore
     stat:
-      path: "/etc/tls/{{ tenant }}/{{ broker.application }}"
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
     register: kafka_server_key
   
   - name: ENCRYPTION OVERLAY (CONTROL CENTER) | ensure TLS {{ broker.application }} directory is present
     file:
-      path: /etc/tls/{{ tenant }}/{{ broker.application }}
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
       state: directory
       mode: 0755
       owner: "{{ control.center.user }}"
@@ -22,7 +22,7 @@
   - name: ENCRYPTION OVERLAY (CONTROL CENTER) | distributing certificates to control center node(s)
     copy:
       src: "{{ item }}"
-      dest: "/etc/tls/{{ tenant }}/{{ broker.application }}/"
+      dest: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/"
       owner: "{{ control.center.user }}"
       group: "{{ control.center.group }}"
       mode: 0600
@@ -46,11 +46,11 @@
       state: present
       block: |
         confluent.controlcenter.streams.security.protocol=SSL
-        confluent.controlcenter.streams.ssl.truststore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+        confluent.controlcenter.streams.ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
         confluent.controlcenter.streams.ssl.truststore.password={{ storepass }}
-        confluent.controlcenter.streams.ssl.keystore.location=/etc/tls/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+        confluent.controlcenter.streams.ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
         confluent.controlcenter.streams.ssl.keystore.password={{ storepass }}
         confluent.controlcenter.streams.ssl.key.password={{ keypass }}
     notify: restart controlcenter
   
-  become: true
+  become: "{{ got_root | default('yes') }}"

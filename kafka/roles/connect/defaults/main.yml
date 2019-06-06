@@ -11,6 +11,17 @@ connect:
       restPort: 8083
     # tune the key converter to the message
     # kafka-console-consumer --bootstrap-server X:9092 --property print.key=true --from-beginning --topic X
+    replicators:
+      - name: replicator
+        config:
+          connector.class: io.confluent.connect.replicator.ReplicatorSourceConnector
+          tasks.max: 4
+          key.converter: io.confluent.connect.replicator.util.ByteArrayConverter
+          value.converter: io.confluent.connect.replicator.util.ByteArrayConverter
+          src.kafka.bootstrap.servers: "{{ broker_source_nodes[:5] | join(':' + broker.config.broker_port + ',') }}:{{ broker.config.broker_port }}"
+          dest.kafka.bootstrap.servers: "{{ broker_destination_nodes[:5] | join(':' + broker.config.broker_port + ',') }}:{{ broker.config.broker_port }}"
+          topic.whitelist: "{{ replication_topics | join(',') }}"
+          topic.rename.format: ${topic}
     connectors:
       - name: es_log_sink
         config:
@@ -18,67 +29,67 @@ connect:
           tasks.max: 1
           topics: telegraf_log
           topic.index.map: telegraf_log:log_index
-          connection.url: "http://{{ groups['elasticsearch_public'] | first }}:{{ elasticsearch.config.restPort }}"
+          connection.url: "http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}"
           type.name: true
           key.ignore: true
           schema.ignore: true
           schemas.enable: false
           key.converter: org.apache.kafka.connect.storage.StringConverter
-      # - name: es_cpu_sink
-#         config:
-#           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
-#           tasks.max: 1
-#           topics: telegraf_cpu
-#           topic.index.map: telegraf_cpu:cpu_index
-#           connection.url: "http://{{ groups['elasticsearch_public'] | first }}:{{ elasticsearch.config.restPort }}"
-#           type.name: true
-#           key.ignore: true
-#           schema.ignore: true
-#           schemas.enable: false
-#           key.converter: org.apache.kafka.connect.storage.StringConverter
-#       - name: es_disk_sink
-#         config:
-#           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
-#           tasks.max: 1
-#           topics: telegraf_disk
-#           topic.index.map: telegraf_disk:disk_index
-#           connection.url: "http://{{ groups['elasticsearch_public'] | first }}:{{ elasticsearch.config.restPort }}"
-#           type.name: true
-#           key.ignore: true
-#           schema.ignore: true
-#           schemas.enable: false
-#           key.converter: org.apache.kafka.connect.storage.StringConverter
+      - name: es_cpu_sink
+        config:
+          connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
+          tasks.max: 1
+          topics: telegraf_cpu
+          topic.index.map: telegraf_cpu:cpu_index
+          connection.url: "http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}"
+          type.name: true
+          key.ignore: true
+          schema.ignore: true
+          schemas.enable: false
+          key.converter: org.apache.kafka.connect.storage.StringConverter
+      - name: es_disk_sink
+        config:
+          connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
+          tasks.max: 1
+          topics: telegraf_disk
+          topic.index.map: telegraf_disk:disk_index
+          connection.url: "http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}"
+          type.name: true
+          key.ignore: true
+          schema.ignore: true
+          schemas.enable: false
+          key.converter: org.apache.kafka.connect.storage.StringConverter
       - name: es_diskio_sink
         config:
           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
           tasks.max: 1
           topics: telegraf_diskio
           topic.index.map: telegraf_diskio:diskio_index
-          connection.url: "http://{{ groups['elasticsearch_public'] | first }}:{{ elasticsearch.config.restPort }}"
+          connection.url: "http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}"
           type.name: true
           key.ignore: true
           schema.ignore: true
           schemas.enable: false
           key.converter: org.apache.kafka.connect.storage.StringConverter
-#       - name: es_kernel_sink
-#         config:
-#           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
-#           tasks.max: 1
-#           topics: telegraf_kernel
-#           topic.index.map: telegraf_kernel:kernel_index
-#           connection.url: "http://{{ groups['elasticsearch_public'] | first }}:{{ elasticsearch.config.restPort }}"
-#           type.name: true
-#           key.ignore: true
-#           schema.ignore: true
-#           schemas.enable: false
-#           key.converter: org.apache.kafka.connect.storage.StringConverter
+      - name: es_kernel_sink
+        config:
+          connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
+          tasks.max: 1
+          topics: telegraf_kernel
+          topic.index.map: telegraf_kernel:kernel_index
+          connection.url: "http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}"
+          type.name: true
+          key.ignore: true
+          schema.ignore: true
+          schemas.enable: false
+          key.converter: org.apache.kafka.connect.storage.StringConverter
       - name: es_mem_sink
         config:
           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
           tasks.max: 1
           topics: telegraf_mem
           topic.index.map: telegraf_mem:mem_index
-          connection.url: "http://{{ groups['elasticsearch_public'] | first }}:{{ elasticsearch.config.restPort }}"
+          connection.url: "http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}"
           type.name: true
           key.ignore: true
           schema.ignore: true
@@ -90,36 +101,36 @@ connect:
           tasks.max: 1
           topics: telegraf_processes
           topic.index.map: telegraf_processes:processes_index
-          connection.url: "http://{{ groups['elasticsearch_public'] | first }}:{{ elasticsearch.config.restPort }}"
+          connection.url: "http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}"
           type.name: true
           key.ignore: true
           schema.ignore: true
           schemas.enable: false
           key.converter: org.apache.kafka.connect.storage.StringConverter
-#       - name: es_swap_sink
-#         config:
-#           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
-#           tasks.max: 1
-#           topics: telegraf_swap
-#           topic.index.map: telegraf_swap:swap_index
-#           connection.url: "http://{{ groups['elasticsearch_public'] | first }}:{{ elasticsearch.config.restPort }}"
-#           type.name: true
-#           key.ignore: true
-#           schema.ignore: true
-#           schemas.enable: false
-#           key.converter: org.apache.kafka.connect.storage.StringConverter
-#       - name: es_system_sink
-#         config:
-#           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
-#           tasks.max: 1
-#           topics: telegraf_system
-#           topic.index.map: telegraf_system:system_index
-#           connection.url: "http://{{ groups['elasticsearch_public'] | first }}:{{ elasticsearch.config.restPort }}"
-#           type.name: true
-#           key.ignore: true
-#           schema.ignore: true
-#           schemas.enable: false
-#           key.converter: org.apache.kafka.connect.storage.StringConverter
+      - name: es_swap_sink
+        config:
+          connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
+          tasks.max: 1
+          topics: telegraf_swap
+          topic.index.map: telegraf_swap:swap_index
+          connection.url: "http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}"
+          type.name: true
+          key.ignore: true
+          schema.ignore: true
+          schemas.enable: false
+          key.converter: org.apache.kafka.connect.storage.StringConverter
+      - name: es_system_sink
+        config:
+          connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
+          tasks.max: 1
+          topics: telegraf_system
+          topic.index.map: telegraf_system:system_index
+          connection.url: "http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}"
+          type.name: true
+          key.ignore: true
+          schema.ignore: true
+          schemas.enable: false
+          key.converter: org.apache.kafka.connect.storage.StringConverter
 broker:
    config:
      # if this gets changed it needs to be changed under kafka defaults

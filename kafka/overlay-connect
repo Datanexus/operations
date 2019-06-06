@@ -18,10 +18,10 @@
       when:
         - groups['kafka_connect'] is not defined
         - cloud == 'aws'
-    
-    - name: CONFLUENT CONNECTOR OVERLAY | building kafka broker host group
+        
+    - name: CONFLUENT CONNECTOR OVERLAY | building kafka connect host group
       add_host: hostname="{{ item }}" groupname=kafka_connect ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-{{ broker.application }}-{{ domain }}-private-key.pem"
-      with_items: "{{ connect_instances.instances|map(attribute='private_ip_address')|list }}"
+      with_items: "{{ connect_instances.instances | map(attribute='private_ip_address') | list }}"
       when:
         - connect_instances.instances is defined
         - connect_instances.instances | length > 0
@@ -47,7 +47,33 @@
         - elasticsearch_instances.instances | length > 0
 
 # this is necessary before we build host groups from the ansible server
-- name: CONFLUENT CONNECTOR OVERLAY | discovering elasticsearch facts
+- name: KAFKA CONNECTOR OVERLAY | discovering source broker facts
+  hosts: broker_source
+  tasks:
+    - setup:
+
+# this is necessary before we build host groups from the ansible server
+- name: KAFKA CONNECTOR OVERLAY | discovering elasticsearch facts
+  hosts: broker_destination
+  tasks:
+    - setup:
+
+- name: KAFKA CONNECTOR OVERLAY | building source and destination broker public internal host groups
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: KAFKA CONNECTOR OVERLAY | building broker source public internal host group
+      add_host: hostname="{{ hostvars[item].ansible_default_ipv4.address }}" groupname=broker_source_public
+      with_items: "{{ groups['broker_source'] }}"
+      when: "'broker_source' in groups | default([])"
+      
+    - name: KAFKA CONNECTOR OVERLAY | building broker destination public internal host group
+      add_host: hostname="{{ hostvars[item].ansible_default_ipv4.address }}" groupname=broker_destination_public
+      with_items: "{{ groups['broker_destination'] }}"
+      when: "'broker_destination' in groups | default([])"
+      
+# this is necessary before we build host groups from the ansible server
+- name: KAFKA CONNECTOR OVERLAY | discovering elasticsearch facts
   hosts: elasticsearch
   tasks:
     - setup:
@@ -57,7 +83,7 @@
   gather_facts: no
   tasks:
     - name: CONFLUENT OVERLAY | building elasticsearch public internal host group
-      add_host: hostname="{{ hostvars[item].ansible_eth1.ipv4.address }}" groupname=elasticsearch_public
+      add_host: hostname="{{ hostvars[item].ansible_default_ipv4.address }}" groupname=elasticsearch_public
       with_items: "{{ groups['elasticsearch'] }}"
       when: "'elasticsearch' in groups | default([])"
 
@@ -72,7 +98,7 @@
   gather_facts: no
   tasks:
     - name: CONFLUENT OVERLAY | building elasticsearch public internal host group
-      add_host: hostname="{{ hostvars[item].ansible_eth1.ipv4.address }}" groupname=connect_public
+      add_host: hostname="{{ hostvars[item].ansible_default_ipv4.address }}" groupname=connect_public
       with_items: "{{ groups['kafka_connect'] }}"
       when: "'kafka_connect' in groups | default([])"
 
@@ -80,7 +106,8 @@
 - name: CONFLUENT CONNECTOR OVERLAY | configuring connectors
   hosts: kafka_connect[0]
   vars_files:
-    - vars/connect.yml
+    - "{{ tenant_config_path }}/config/applications/kafka.yml"
+    - "{{ tenant_config_path }}/config/applications/connect.yml"
   gather_facts: yes
   tasks:
     - import_role:

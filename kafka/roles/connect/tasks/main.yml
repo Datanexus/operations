@@ -3,15 +3,51 @@
 #
 #
 ---
+# this is a little repetitive, but we ultimately we only deploy connectors that are defined
+
+# all these facts need to have default values if the tentant toplogy doesn't
+- set_fact:
+    elasticsearch_node: "{{ groups['elasticsearch_public'] | first }}"
+  when:
+    - "'elasticsearch_public' in groups"
+
+- set_fact:
+    elasticsearch_node: ([])
+  when:
+    - "'elasticsearch_public' not in groups"
+
+- set_fact:
+    broker_source_nodes: "{{ groups['broker_source_public'] }}"
+  when:
+    - "'broker_source' in groups"
+
+- set_fact:
+    broker_source_nodes: ([])
+  when:
+    - "'broker_source' not in groups"
+
+- set_fact:
+    broker_destination_nodes: "{{ groups['broker_destination_public'] }}"
+  when:
+    - "'broker_destination' in groups"
+
+- set_fact:
+    broker_destination_nodes: ([])
+  when:
+    - "'broker_destination' not in groups"
+
+- set_fact:
+    replication_topics: ([])
+  when:
+    - replication is undefined
+
+- set_fact:
+    replication_topics: "{{ replication.topics }}"
+  when:
+    - replication is defined
+
+# deploy any replication workers
 - block:
-  
-  - set_fact:
-      all_connectors: "{{ connectors }} + {{ connect.distributed.connectors }}"
-    when: connectors is defined
-  
-  - set_fact:
-      all_connectors: "{{ connect.distributed.connectors }}"
-    when: connectors is undefined
   
   - name: CONFLUENT OVERLAY (BROKER) | checking existing connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
     uri:
@@ -30,12 +66,77 @@
       body: "{{ item }}"
       status_code: 201
       body_format: json
-    loop: "{{ all_connectors }}"
+    loop: "{{ connect.distributed.replicators }}"
     loop_control:
       loop_var: item
     when:
       - groups['connect_public'] | length > 0
       - not item.name in active_connectors.json
+  
+  when:
+    - replication is defined
+    - "'broker_source' in groups | default([])"
+    - "'broker_destination' in groups | default([])"
+
+# deploy any elasticsearch workers
+- block:
+  
+  - name: KAFKA OVERLAY (BROKER) | checking existing connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
+    uri:
+      url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors"
+      method: GET
+      status_code: 200
+    register: active_connectors
+    when:
+      - groups['connect_public'] | length > 0
+      
+  # only POST a new connector if the name is unique
+  - name: KAFKA OVERLAY (BROKER) | creating connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
+    uri:
+      url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors"
+      method: POST
+      body: "{{ item }}"
+      status_code: 201
+      body_format: json
+    loop: "{{ connect.distributed.connectors }}"
+    loop_control:
+      loop_var: item
+    when:
+      - groups['connect_public'] | length > 0
+      - not item.name in active_connectors.json
+  
+  when:
+    - "'elasticsearch' in groups | default([])"
+
+# deploy any tenant workers
+- block:
+  
+  - name: CONFLUENT OVERLAY (BROKER) | checking existing connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
+    uri:
+      url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors"
+      method: GET
+      status_code: 200
+    register: active_connectors
+    when:
+      - groups['connect_public'] | length > 0
+      
+  # only POST a new connector if the name is unique
+  - name: CONFLUENT OVERLAY (BROKER) | creating connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
+    uri:
+      url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors"
+      method: POST
+      body: "{{ item }}"
+      status_code: 201
+      body_format: json
+    loop: "{{ connectors }}"
+    loop_control:
+      loop_var: item
+    when:
+      - groups['connect_public'] | length > 0
+      - not item.name in active_connectors.json
+  
+  when:
+    - connectors is defined
     
   # - name: CONFLUENT OVERLAY (BROKER) | updating elasticsearch sink
 #     uri:

@@ -1,7 +1,7 @@
 # (c) 2016 DataNexus Inc.  All Rights Reserved.
 # Licensed software not for distribution
 #
-# enable telagraf to broker encryption
+# enable telagraf to kafka broker encryption
 ---
 - block:
   
@@ -22,8 +22,8 @@
   - name: ENCRYPTION OVERLAY (TELEGRAF) | checking existing TLS {{ telegraf.service_name }} path
     stat:
       path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name }}"
-    register: telegraf_key
-  
+    register: telegraf_dir
+      
   # the certificate directory tenant path must always be readable by every process
   - name: ENCRYPTION OVERLAY (TELEGRAF) | ensure TLS {{ telegraf.service_name }} directory is present
     file:
@@ -32,9 +32,30 @@
       owner: "{{ telegraf.user }}"
       group: "{{ telegraf.group }}"
       mode: 0755
-    when: not telegraf_key.stat.exists
+    when:
+      - not telegraf_dir.stat.exists
   
-  - name: ENCRYPTION OVERLAY (TELEGRAF) | distributing certificates to telegraf nodes
+  - name: ENCRYPTION OVERLAY (TELEGRAF) | removing existing telegraf.service_name credentials 
+    file:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name }}/{{ item }}"
+      state: absent
+    with_items:
+      - ca-key.unec
+      - ca-key
+      - ca-cert
+      - client-cert
+      - client-key
+      - openssl.cnf
+    when:
+      - regenerate_certs
+    
+  - name: ENCRYPTION OVERLAY (BROKER) | checking existing {{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name }}/ca-cert
+    stat:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name }}/ca-cert"
+    register: existing_ca_cert
+  
+  # the CA keys are put in the telegraf area to keep shaw master from being removed
+  - name: ENCRYPTION OVERLAY (TELEGRAF) | distributing CA key to all telegraf nodes
     copy:
       src: "{{ item }}"
       dest: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name }}/"
@@ -42,11 +63,32 @@
       group: "{{ telegraf.group }}"
       mode: 0600
     with_items:
+      - "{{ key_path }}/ca-key"
       - "{{ key_path }}/ca-cert"
-      - "{{ key_path }}/ca-key.unec"
-      - "{{ key_path }}/client-cert"
+    when:
+      - not existing_ca_cert.stat.exists
     notify: restart telegraf
+    
+  - name: ENCRYPTION OVERLAY (TELEGRAF) | checking existing unencrypted ca key for telegraf
+    stat:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name }}/ca-key.unec"
+    register: existing_unencrytped_ca_key
+
+  - name: ENCRYPTION OVERLAY (TELEGRAF) | stripping encryption from private key for telegraf
+    command: openssl rsa -in {{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name }}/ca-key -out {{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name }}/ca-key.unec -passin pass:{{ cert.keypass }}
+    when:
+      - not existing_unencrytped_ca_key.stat.exists
+      
+  - name: ENCRYPTION OVERLAY (TELEGRAF) | checking existing {{ telegraf.service_name }} client-cert
+    stat:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name }}/client-cert"
+    register: existing_client_cert
   
+  - name: ENCRYPTION OVERLAY (TELEGRAF) | generating client private key and self-signed certificate
+    command: openssl req -new -x509 -out {{ shaw.config.tls_path }}/{{ tenant }}/{{ telegraf.service_name }}/client-cert -days {{ cert.duration }} -passout pass:{{ cert.keypass }} -subj "/CN={{ hostvars[inventory_hostname].ansible_facts.fqdn }}/OU={{ cert.OU }}/O={{ cert.O }}/L={{ cert.L }}/C={{ cert.C }}"
+    when: 
+      - not existing_client_cert.stat.exists
+
   # insure_skip_verify set to true per https://sematext.com/opensee/m/InfluxDB/F4bYuyXWvm1U2FVY1?subj=+InfluxData+Community+Collect+Telegraf+Kafka+output+SSL+questions
   # is there a problem with the self-signed chain?
   - name: TELEGRAF OVERLAY (TELEGRAF) | enabling and configuring kafka output
@@ -160,5 +202,7 @@
           #   keys = ["foo", "bar"]
           #   separator = "_"
     notify: restart telegraf
-      
-  become: yes
+    
+  become: "{{ got_root | default('yes') }}"
+  when:
+    - telegraf.enabled

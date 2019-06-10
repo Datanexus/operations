@@ -15,18 +15,23 @@ fi
 export application="$1"   #  overlay to deploy
 
 # if encryption is deployed statically; grab the inventory from the front and dump the argument
-if [ $# -eq 11 ]  && [ -d "${11}" ]; then
-  INVENTORY="--inventory=$2"
+if [ $# -eq 9 ]  && [ -d "${9}" ]; then
+  INVENTORY="--inventory=${2}"
+  cluster=`basename ${2} | cut -d. -f2`       # derive the cluster if not passed in
   shift && shift
+else
+  cluster=${7}
 fi
+
+tenant=`/usr/bin/basename ${6}`         # derive tenant name from the path
 
 # likely called by the orchestrator to just pass through everything
 if [ $# -eq 3 ] && [ "$2" = "-e" ]; then
   ./overlay-"$application" "$2" "$3"
 
 # deploy telegraf as an overlay without the orchestrator
-elif [ $# -eq 9 ] && [ -d "${9}" ]; then
-  ./overlay-"$application" $INVENTORY -e "tenant=$1 project=$2 cloud=$3 region=$4 domain=$5 cluster=$6 user=$7 tenant_config_path=${8} key_path=${9}"
+elif [ $# -eq 7 ] && [ -d "${7}" ]; then
+  ./overlay-"$application" $INVENTORY -e "project=$1 cloud=$2 region=$3 domain=$4 user=${5} tenant_config_path=${6} key_path=${7} tenant=${tenant} cluster=${cluster}"
 # elif [ $# -eq 1 ] && [ -f "$1" ] && [ -s "$1" ]; then
 #   ./provision-postgresql --tags "vm,$application" -e "configuration=$1"
 fi

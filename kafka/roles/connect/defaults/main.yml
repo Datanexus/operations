@@ -22,7 +22,8 @@ connect:
           dest.kafka.bootstrap.servers: "{{ broker_destination_nodes[:5] | join(':' + broker.config.broker_port + ',') }}:{{ broker.config.broker_port }}"
           topic.whitelist: "{{ replication_topics | join(',') }}"
           topic.rename.format: ${topic}
-    connectors:
+          src.consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
+    elasticsearch:
       - name: es_log_sink
         config:
           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
@@ -35,6 +36,7 @@ connect:
           schema.ignore: true
           schemas.enable: false
           key.converter: org.apache.kafka.connect.storage.StringConverter
+          consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
       - name: es_cpu_sink
         config:
           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
@@ -47,6 +49,7 @@ connect:
           schema.ignore: true
           schemas.enable: false
           key.converter: org.apache.kafka.connect.storage.StringConverter
+          consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
       - name: es_disk_sink
         config:
           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
@@ -59,6 +62,7 @@ connect:
           schema.ignore: true
           schemas.enable: false
           key.converter: org.apache.kafka.connect.storage.StringConverter
+          consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
       - name: es_diskio_sink
         config:
           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
@@ -71,6 +75,7 @@ connect:
           schema.ignore: true
           schemas.enable: false
           key.converter: org.apache.kafka.connect.storage.StringConverter
+          consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
       - name: es_kernel_sink
         config:
           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
@@ -83,6 +88,7 @@ connect:
           schema.ignore: true
           schemas.enable: false
           key.converter: org.apache.kafka.connect.storage.StringConverter
+          consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
       - name: es_mem_sink
         config:
           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
@@ -95,6 +101,7 @@ connect:
           schema.ignore: true
           schemas.enable: false
           key.converter: org.apache.kafka.connect.storage.StringConverter
+          consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
       - name: es_processes_sink
         config:
           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
@@ -107,6 +114,7 @@ connect:
           schema.ignore: true
           schemas.enable: false
           key.converter: org.apache.kafka.connect.storage.StringConverter
+          consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
       - name: es_swap_sink
         config:
           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
@@ -119,6 +127,7 @@ connect:
           schema.ignore: true
           schemas.enable: false
           key.converter: org.apache.kafka.connect.storage.StringConverter
+          consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
       - name: es_system_sink
         config:
           connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
@@ -131,6 +140,7 @@ connect:
           schema.ignore: true
           schemas.enable: false
           key.converter: org.apache.kafka.connect.storage.StringConverter
+          consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
 broker:
    config:
      # if this gets changed it needs to be changed under kafka defaults

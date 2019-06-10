@@ -7,12 +7,24 @@
 
 - block:
   
-  - name: ENCRYPTION OVERLAY (BROKERS) | checking existing server keystore
+  - name: ENCRYPTION OVERLAY (BROKER) | checking {{ shaw.config.tls_path }}/{{ tenant }}/ca for {{ broker.application }} TLS
+    stat:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/ca"
+    register: ca_dir
+
+  - name: ENCRYPTION OVERLAY (BROKER) | ensuring {{ shaw.config.tls_path }}/{{ tenant }}/ca exists for {{ broker.application }} TLS
+    file:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/ca"
+      state: directory
+      mode: 0755
+    when: not ca_dir.stat.exists
+    
+  - name: ENCRYPTION OVERLAY (BROKER) | checking existing {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}
     stat:
       path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
     register: kafka_server_key
   
-  - name: ENCRYPTION OVERLAY (BROKERS) | ensure TLS kafka directory is present
+  - name: ENCRYPTION OVERLAY (BROKER) | ensure TLS kafka directory is present
     file:
       path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
       state: directory
@@ -20,34 +32,129 @@
       owner: "{{ broker.user }}"
       group: "{{ broker.group }}"
     when: not kafka_server_key.stat.exists
-
-  - name: ENCRYPTION OVERLAY (BROKERS) | distributing certificates to all cluster nodes
+  
+  - name: ENCRYPTION OVERLAY (BROKER) | removing existing CA credentials 
+    file:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/ca/{{ item }}"
+      state: absent
+    with_items:
+      - ca-cert
+      - ca-key
+      - ca-cert.srl
+    when: regenerate_certs
+      
+  - name: ENCRYPTION OVERLAY (BROKER) | checking existing {{ shaw.config.tls_path }}/{{ tenant }}/ca/ca-cert
+    stat:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/ca/ca-cert"
+    register: existing_ca_cert
+    
+  - name: ENCRYPTION OVERLAY (BROKER) | distributing required CA files to all brokers
     copy:
       src: "{{ item }}"
-      dest: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/"
+      dest: "{{ shaw.config.tls_path }}/{{ tenant }}/ca/"
       owner: "{{ broker.user }}"
       group: "{{ broker.group }}"
       mode: 0600
     with_items:
-      - "{{ key_path }}/kafka.server.keystore.jks"
-      - "{{ key_path }}/kafka.server.truststore.jks"
+      - "{{ key_path }}/ca-cert"
+      - "{{ key_path }}/ca-key"
+    when:
+      - not existing_ca_cert.stat.exists
     notify: restart broker
+    
+  - name: ENCRYPTION OVERLAY (BROKER) | removing existing {{ broker.application }} files 
+    file:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/{{ item }}"
+      state: absent
+    with_items:
+      - kafka.server.keystore.jks
+      - kafka.server.truststore.jks
+      - openssl.cnf
+      - signed-ca-cert
+      - unsigned-ca-request
+      - openssl.cnf
+    when: regenerate_certs
+      
+  # these two plays are for SAN -- but doesn't seem to have any effect in the client
+  - name: ENCRYPTION OVERLAY (BROKER) | copying default openssl.cnf
+    command: cp /etc/pki/tls/openssl.cnf {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}
   
-  - name: ENCRYPTION OVERLAY (BROKERS) | configuring SSL listeners
+  - name: ENCRYPTION OVERLAY (BROKER) | adding private external IP to subject alternative names to v3_ca
+    lineinfile:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/openssl.cnf"
+      regexp: '^subjectAltName\t\t='
+      line: "subjectAltName\t\t= IP:{{ groups['kafka_public'] | join(',' +  'IP:') }}"
+      insertafter: '^\[ v3_ca \]'
+  
+  - name: ENCRYPTION OVERLAY (BROKER) | checking existing kafka.server.keystore.jks keystore
+    stat:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.server.keystore.jks"
+    register: server_keystore
+  
+  - name: ENCRYPTION OVERLAY (BROKER) | generating kafka.server.keystore.jks keystore
+    command: keytool -keystore {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.server.keystore.jks -alias localhost -validity {{ cert.duration }} -genkey -keyalg RSA -storepass {{ cert.storepass }} -keypass {{ cert.keypass }} -dname "CN={{ cert.CN }}, OU={{ cert.OU }}, O={{ cert.O }}, L={{ cert.L }}, C={{ cert.C }}"
+    when: not server_keystore.stat.exists
+  
+  - name: ENCRYPTION OVERLAY (BROKER) | checking existing kafka.server.truststore.jks truststore
+    stat:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.server.truststore.jks"
+    register: kafka_server_trust
+  
+  - name: ENCRYPTION OVERLAY (BROKER) | importing CA certificate into server truststore
+    command: keytool -keystore {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.server.truststore.jks -alias CARoot -import -file {{ shaw.config.tls_path }}/{{ tenant }}/ca/ca-cert -storepass {{ cert.storepass }} -keypass {{ cert.keypass }} -noprompt
+    when: not kafka_server_trust.stat.exists
+  
+  - name: ENCRYPTION OVERLAY (BROKER) | checking existing {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/unsigned-ca-request
+    stat:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/unsigned-ca-request"
+    register: unsigned_request
+    
+  # added SAN here???
+  - name: ENCRYPTION OVERLAY (BROKER) | creating signing request from broker keystore
+    command: keytool -keystore {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.server.keystore.jks -alias localhost -certreq -ext SAN=IP:{{ hostvars[inventory_hostname].ansible_eth0.ipv4.address }} -file {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/unsigned-ca-request -storepass {{ cert.storepass }}
+    when: not unsigned_request.stat.exists
+    
+  - name: ENCRYPTION OVERLAY (BROKER) | checking existing signed ca cert
+    stat:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/signed-ca-cert"
+    register: signed_cert
+
+  # by using a modified openssl.cnf we preserve the SAN in the signed certificate - is this possible some other way
+  - name: ENCRYPTION OVERLAY (BROKER) | signing unsigned server certificate with CA private key
+    command: openssl x509 -extfile {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/openssl.cnf -extensions v3_ca -req -CA {{ shaw.config.tls_path }}/{{ tenant }}/ca/ca-cert -CAkey {{ shaw.config.tls_path }}/{{ tenant }}/ca/ca-key -in {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/unsigned-ca-request -out {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/signed-ca-cert -days {{ cert.duration }} -CAcreateserial -passin pass:{{ cert.keypass }}
+    when: not signed_cert.stat.exists
+    
+  - name: ENCRYPTION OVERLAY (BROKER) | importing unsigned server certificate into kafka.server.keystore.jks keystore
+    command: keytool -keystore {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.server.keystore.jks -alias CARoot -import -file {{ shaw.config.tls_path }}/{{ tenant }}/ca/ca-cert -storepass {{ cert.storepass }} -noprompt
+    when: not server_keystore.stat.exists
+    
+  - name: ENCRYPTION OVERLAY (BROKER) | importing signed server certificate into kafka.server.keystore.jks keystore
+    command: keytool -keystore {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.server.keystore.jks -alias localhost -import -file {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/signed-ca-cert -storepass {{ cert.storepass }} -noprompt
+    when: not server_keystore.stat.exists
+  
+  # this is purely so each broker can CLI consume-topic from the others; it has no effect on the broker functionality
+  - import_tasks: generate-client.yml
+    vars:
+      client_name: BROKER
+      client_owner: "{{ connect.distributed.user }}"
+      client_group: "{{ connect.distributed.group }}"
+      client_handler: broker
+      
+  - name: ENCRYPTION OVERLAY (BROKER) | configuring SSL listeners
     replace:
       path: "{{ broker.config_file }}"
       regexp: '^listeners=PLAINTEXT://{{ kafka_interface_ipv4 }}:{{ broker.config.port }}$'
       replace: "listeners=SSL://{{ kafka_interface_ipv4 }}:{{ broker.config.sslPort }}"
     notify: restart broker
 
-  - name: ENCRYPTION OVERLAY (BROKERS) | defaulting advertised listens to SSL
+  - name: ENCRYPTION OVERLAY (BROKER) | defaulting advertised listens to SSL
     replace:
       path: "{{ broker.config_file }}"
       regexp: '^advertised.listeners=PLAINTEXT://{{ kafka_interface_ipv4 }}:{{ broker.config.port }}$'
       replace: "advertised.listeners=SSL://{{ kafka_interface_ipv4 }}:{{ broker.config.sslPort }}"
     notify: restart broker
     
-  - name: ENCRYPTION OVERLAY (BROKERS) | enabling SSL for internode communication
+  - name: ENCRYPTION OVERLAY (BROKER) | enabling SSL for internode communication
     blockinfile:
       path: "{{ broker.config_file }}"
       marker: "# {{ broker.application }} SSL {mark} ANSIBLE MANAGED BLOCK"
@@ -58,16 +165,16 @@
         ssl.protocol=TLSv1
         ssl.client.auth=required
         ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.server.keystore.jks
-        ssl.keystore.password={{ storepass }}
-        ssl.key.password={{ keypass }}
+        ssl.keystore.password={{ cert.storepass }}
+        ssl.key.password={{ cert.keypass }}
         ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.server.truststore.jks
-        ssl.truststore.password={{ storepass }}
+        ssl.truststore.password={{ cert.storepass }}
         ssl.enabled.protocols=TLSv1.2,TLSv1.1,TLSv1
         ssl.keystore.type=JKS
     notify: restart broker
 
   # cap number of brokers in config at 5
-  - name: ENCRYPTION OVERLAY (BROKERS) | updating control center metrics bootstrap servers for {{ broker.service_name }}
+  - name: ENCRYPTION OVERLAY (BROKER) | updating control center metrics bootstrap servers for {{ broker.service_name }}
     lineinfile:
       path: "{{ broker.config_file }}"
       regexp: '^confluent.metrics.reporter.bootstrap.servers='
@@ -78,7 +185,7 @@
       - groups['controlcenter'] | length > 0
     notify: restart broker
     
-  - name: ENCRYPTION OVERLAY (BROKERS) | configuring SSL for metrics reporting
+  - name: ENCRYPTION OVERLAY (BROKER) | configuring SSL for metrics reporting
     blockinfile:
       path: "{{ broker.config_file }}"
       marker: "# metrics SSL {mark} ANSIBLE MANAGED BLOCK"
@@ -87,13 +194,13 @@
       block: |
         confluent.metrics.reporter.security.protocol=SSL
         confluent.metrics.reporter.ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.server.truststore.jks
-        confluent.metrics.reporter.ssl.truststore.password={{ storepass }}
+        confluent.metrics.reporter.ssl.truststore.password={{ cert.storepass }}
         confluent.metrics.reporter.ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.server.keystore.jks
-        confluent.metrics.reporter.ssl.keystore.password={{ storepass }}
-        confluent.metrics.reporter.ssl.key.password={{ keypass }}
+        confluent.metrics.reporter.ssl.keystore.password={{ cert.storepass }}
+        confluent.metrics.reporter.ssl.key.password={{ cert.keypass }}
     when:
       - groups['controlcenter'] is defined
       - groups['controlcenter'] | length > 0
     notify: restart broker
-  
+      
   become: "{{ got_root | default('yes') }}"

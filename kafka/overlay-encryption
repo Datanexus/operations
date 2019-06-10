@@ -49,6 +49,7 @@
   hosts: localhost
   vars_files:
     - roles/encryption/defaults/main.yml
+    - "{{ tenant_config_path }}/config/applications/confluent.yml"
   tasks:
     - ec2_instance_facts:
         region: "{{ region }}"
@@ -64,7 +65,7 @@
         - cloud == 'aws'
     
     - name: ENCRYPTION OVERLAY (KAFKA) | building kafka broker host group
-      add_host: hostname="{{ item }}" groupname=kafka_broker ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-{{ broker.application }}-{{ domain }}-private-key.pem"
+      add_host: hostname="{{ item }}" groupname=kafka_broker ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-{{ application }}-{{ domain }}-private-key.pem"
       with_items: "{{ kafka_instances.instances|map(attribute='private_ip_address')|list }}"
       when:
         - kafka_instances.instances is defined
@@ -106,22 +107,6 @@
       add_host: hostname="{{ hostvars[item].ansible_eth1.ipv4.address }}" groupname=kafka_public
       with_items: "{{ groups['kafka_broker'] }}"
       when: "'kafka_broker' in groups | default([])"
-      
-- name: ENCRYPTION OVERLAY (KAFKA) | creating keystores and truststores
-  hosts: shaw
-  vars_files:
-    - "{{ tenant_config_path }}/config/site.yml"
-    - "{{ tenant_config_path }}/config/applications/shaw.yml"
-    - "{{ tenant_config_path }}/config/applications/confluent.yml"
-    - "{{ tenant_config_path }}/config/applications/telegraf.yml"
-  gather_facts: yes
-  tasks:
-    - include_role:
-        name: encryption
-        tasks_from: generate-ca
-    - include_role:
-        name: encryption
-        tasks_from: generate-client
       
 - name: ENCRYPTION OVERLAY (KAFKA) | configuring broker encryption
   hosts: kafka_broker
@@ -228,32 +213,3 @@
   tasks:
     - include_role:
         name: postflight
-    
-    - include_role:
-        name: encryption
-        tasks_from: copy-stores
-        
-- name: ENCRYPTION OVERLAY (KAFKA) | distributing broker client credentials
-  hosts: kafka_clients
-  gather_facts: no
-  tasks:
-    - include_role:
-        name: encryption
-        tasks_from: copy-stores
-
-- name: ENCRYPTION OVERLAY (KAFKA) | removing locally downloaded files
-  hosts: localhost
-  vars_files:
-    - "{{ tenant_config_path }}/config/site.yml"
-  tasks:
-    - name: ENCRYPTION OVERLAY (KAFKA) | removing local stores
-      file:
-        path: "{{ key_path }}/{{ item }}"
-        state: absent
-      with_items:
-        - kafka.server.keystore.jks
-        - kafka.server.truststore.jks
-        - client-cert
-        - ca-cert
-        - ca-key.unec
-      when: cleanup

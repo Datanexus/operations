@@ -3,7 +3,7 @@
 #
 #
 ---
-- name: CONFLUENT CONNECTOR OVERLAY | discovering all connect nodes
+- name: KAFKA CONNECTOR OVERLAY | discovering all relevant nodes
   hosts: localhost
   tasks:
     - ec2_instance_facts:
@@ -14,13 +14,14 @@
           "tag:Domain": "{{ domain }}"
           "tag:Project": "{{ project }}"
           "tag:Tenant": "{{ tenant }}"
+          "tag:Cluster": "{{ cluster | default ('a') }}"
       register: connect_instances
       when:
         - groups['kafka_connect'] is not defined
         - cloud == 'aws'
         
-    - name: CONFLUENT CONNECTOR OVERLAY | building kafka connect host group
-      add_host: hostname="{{ item }}" groupname=kafka_connect ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-{{ broker.application }}-{{ domain }}-private-key.pem"
+    - name: KAFKA CONNECTOR OVERLAY | building kafka connect host group
+      add_host: hostname="{{ item }}" groupname=kafka_connect ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-{{ application }}-{{ domain }}-private-key.pem"
       with_items: "{{ connect_instances.instances | map(attribute='private_ip_address') | list }}"
       when:
         - connect_instances.instances is defined
@@ -34,13 +35,14 @@
           "tag:Domain": "{{ domain }}"
           "tag:Project": "{{ project }}"
           "tag:Tenant": "{{ tenant }}"
+          "tag:Cluster": "{{ cluster | default ('a') }}"
       register: elasticsearch_instances
       when:
         - groups['elasticsearch'] is not defined
         - cloud == 'aws'
     
-    - name: CONFLUENT CONNECTOR OVERLAY | building elasticsearch host group
-      add_host: hostname="{{ item }}" groupname=elasticsearch ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-{{ broker.application }}-{{ domain }}-private-key.pem"
+    - name: KAFKA CONNECTOR OVERLAY | building elasticsearch host group
+      add_host: hostname="{{ item }}" groupname=elasticsearch ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-{{ application }}-{{ domain }}-private-key.pem"
       with_items: "{{ elasticsearch_instances.instances|map(attribute='private_ip_address')|list }}"
       when:
         - elasticsearch_instances.instances is defined
@@ -78,32 +80,32 @@
   tasks:
     - setup:
 
-- name: CONFLUENT CONNECTOR OVERLAY | building elasticsearch public internal host group
+- name: KAFKA CONNECTOR OVERLAY | building elasticsearch public internal host group
   hosts: localhost
   gather_facts: no
   tasks:
-    - name: CONFLUENT OVERLAY | building elasticsearch public internal host group
+    - name: KAFKA OVERLAY | building elasticsearch public internal host group
       add_host: hostname="{{ hostvars[item].ansible_default_ipv4.address }}" groupname=elasticsearch_public
       with_items: "{{ groups['elasticsearch'] }}"
       when: "'elasticsearch' in groups | default([])"
 
 # this is necessary before we build host groups from the ansible server
-- name: CONFLUENT CONNECTOR OVERLAY | discovering connect facts
+- name: KAFKA CONNECTOR OVERLAY | discovering connect facts
   hosts: kafka_connect
   tasks:
     - setup:
 
-- name: CONFLUENT CONNECTOR OVERLAY | building elasticsearch public internal host group
+- name: KAFKA CONNECTOR OVERLAY | building elasticsearch public internal host group
   hosts: localhost
   gather_facts: no
   tasks:
-    - name: CONFLUENT OVERLAY | building elasticsearch public internal host group
+    - name: KAFKA OVERLAY | building elasticsearch public internal host group
       add_host: hostname="{{ hostvars[item].ansible_default_ipv4.address }}" groupname=connect_public
       with_items: "{{ groups['kafka_connect'] }}"
       when: "'kafka_connect' in groups | default([])"
 
 # since we run distributed connectors, we only need register on a single host
-- name: CONFLUENT CONNECTOR OVERLAY | configuring connectors
+- name: KAFKA CONNECTOR OVERLAY | configuring connectors
   hosts: kafka_connect[0]
   vars_files:
     - "{{ tenant_config_path }}/config/applications/kafka.yml"

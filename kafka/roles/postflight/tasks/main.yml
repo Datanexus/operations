@@ -21,6 +21,11 @@
       owner: "{{ ansible_user }}"
       group: "{{ ansible_user }}"
     when: not kafka_server_key.stat.exists
+  
+  - name: ENCRYPTION OVERLAY (POSTFLIGHT) | checking existing {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/client-ssl.properties
+    stat:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/client-ssl.properties"
+    register: existing_ssl_config
     
   - name: ENCRYPTION OVERLAY (POSTFLIGHT) | updating client ssl properties
     template:
@@ -29,5 +34,7 @@
       mode: 0644
       owner: "{{ ansible_user }}"
       group:  "{{ ansible_user }}"
-  
+    when:
+      - not existing_ssl_config.stat.exists
+      
   become: "{{ got_root | default('yes') }}"

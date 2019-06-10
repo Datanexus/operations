@@ -2,10 +2,10 @@
 # Licensed software not for distribution
 #
 #
----
+---  
 # this is a little repetitive, but we ultimately we only deploy connectors that are defined
 
-# all these facts need to have default values if the tentant toplogy doesn't
+# all these facts need to have default values if the tentant toplogy doesn't define them
 - set_fact:
     elasticsearch_node: "{{ groups['elasticsearch_public'] | first }}"
   when:
@@ -49,7 +49,7 @@
 # deploy any replication workers
 - block:
   
-  - name: CONFLUENT OVERLAY (BROKER) | checking existing connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
+  - name: KAFKA OVERLAY (CONNECT) | checking existing connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
     uri:
       url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors"
       method: GET
@@ -59,7 +59,7 @@
       - groups['connect_public'] | length > 0
       
   # only POST a new connector if the name is unique
-  - name: CONFLUENT OVERLAY (BROKER) | creating connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
+  - name: KAFKA OVERLAY (CONNECT) | creating connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
     uri:
       url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors"
       method: POST
@@ -75,13 +75,13 @@
   
   when:
     - replication is defined
-    - "'broker_source' in groups | default([])"
-    - "'broker_destination' in groups | default([])"
+    - groups['broker_source'] is defined
+    - groups['broker_destination'] is defined
 
 # deploy any elasticsearch workers
 - block:
   
-  - name: KAFKA OVERLAY (BROKER) | checking existing connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
+  - name: KAFKA OVERLAY (CONNECT) | checking existing connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
     uri:
       url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors"
       method: GET
@@ -91,14 +91,14 @@
       - groups['connect_public'] | length > 0
       
   # only POST a new connector if the name is unique
-  - name: KAFKA OVERLAY (BROKER) | creating connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
+  - name: KAFKA OVERLAY (CONNECT) | creating connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
     uri:
       url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors"
       method: POST
       body: "{{ item }}"
       status_code: 201
       body_format: json
-    loop: "{{ connect.distributed.connectors }}"
+    loop: "{{ connect.distributed.elasticsearch }}"
     loop_control:
       loop_var: item
     when:
@@ -106,12 +106,13 @@
       - not item.name in active_connectors.json
   
   when:
-    - "'elasticsearch' in groups | default([])"
-
+    - groups['elasticsearch'] is defined
+    - groups['elasticsearch'] | length > 0
+    
 # deploy any tenant workers
 - block:
   
-  - name: CONFLUENT OVERLAY (BROKER) | checking existing connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
+  - name: KAFKA OVERLAY (CONNECT) | checking existing connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
     uri:
       url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors"
       method: GET
@@ -121,7 +122,7 @@
       - groups['connect_public'] | length > 0
       
   # only POST a new connector if the name is unique
-  - name: CONFLUENT OVERLAY (BROKER) | creating connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
+  - name: KAFKA OVERLAY (CONNECT) | creating connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
     uri:
       url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors"
       method: POST
@@ -138,7 +139,7 @@
   when:
     - connectors is defined
     
-  # - name: CONFLUENT OVERLAY (BROKER) | updating elasticsearch sink
+  # - name: KAFKA OVERLAY (BROKER) | updating elasticsearch sink
 #     uri:
 #       url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors{{ item.name }}/config"
 #       method: PUT

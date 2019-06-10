@@ -64,3 +64,17 @@
         name: encryption
         tasks_from: encrypt-telegraf
       when: telegraf.enabled
+
+- name: ENCRYPTION OVERLAY (TELEGRAF) | removing locally downloaded files
+  hosts: localhost
+  vars_files:
+    - "{{ tenant_config_path }}/config/site.yml"
+  tasks:
+    - name: ENCRYPTION OVERLAY (TELEGRAF) | removing local stores
+      file:
+        path: "{{ key_path }}/{{ item }}"
+        state: absent
+      with_items:
+        - ca-key
+        - ca-cert
+      when: cleanup

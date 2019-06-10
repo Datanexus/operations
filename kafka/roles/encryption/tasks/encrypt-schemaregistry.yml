@@ -1,7 +1,7 @@
 # (c) 2016 DataNexus Inc.  All Rights Reserved.
 # Licensed software not for distribution
 #
-# enable broker encryption
+# enable schema registry encryption
 ---
 - block:
   
@@ -19,17 +19,12 @@
       group: "{{ schema.registry.group }}"
     when: not kafka_server_key.stat.exists
 
-  - name: ENCRYPTION OVERLAY (SCHEMA REGISTRY) | distributing certificates to control center node(s)
-    copy:
-      src: "{{ item }}"
-      dest: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/"
-      owner: "{{ schema.registry.user }}"
-      group: "{{ schema.registry.group }}"
-      mode: 0600
-    with_items:
-      - "{{ key_path }}/kafka.client.keystore.jks"
-      - "{{ key_path }}/kafka.client.truststore.jks"  
-    notify: restart registry
+  - import_tasks: generate-client.yml
+    vars:
+      client_name: 'SCHEMA REGISTRY'
+      client_owner: "{{ schema.registry.user }}"
+      client_group: "{{ schema.registry.group }}"
+      client_handler: registry
   
   - name: ENCRYPTION OVERLAY (SCHEMA REGISTRY) | disabling zookeeper connections
     lineinfile:
@@ -54,10 +49,10 @@
       block: |
         kafkastore.security.protocol=SSL
         kafkastore.ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
-        kafkastore.ssl.truststore.password={{ storepass }}
+        kafkastore.ssl.truststore.password={{ cert.storepass }}
         kafkastore.ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
-        kafkastore.ssl.keystore.password={{ storepass }}
-        kafkastore.ssl.key.password={{ keypass }}
+        kafkastore.ssl.keystore.password={{ cert.storepass }}
+        kafkastore.ssl.key.password={{ cert.keypass }}
     notify: restart registry
   
   become: "{{ got_root | default('yes') }}"

@@ -49,7 +49,7 @@
 
 # once the brokers are done we can reconfigure all telegraf clients   
 - name: ENCRYPTION OVERLAY (TELEGRAF) | configuring telegraf encryption
-  hosts: all:!kafka_public:!controlcenter_broker:!broker_source:!broker_destination
+  hosts: all:!controlcenter_broker:!all_brokers:!kafka_public
   vars_files:
     - roles/encryption/defaults/main.yml
     - "{{ tenant_config_path }}/config/site.yml"

@@ -3,7 +3,7 @@
 #
 #
 ---
-- name: KAFKA CONNECTOR OVERLAY | discovering all relevant nodes
+- name: OPERATIONS OVERLAY (KAFKA CONNECT) | discovering all relevant nodes
   hosts: localhost
   tasks:
     - ec2_instance_facts:
@@ -20,7 +20,7 @@
         - groups['kafka_connect'] is not defined
         - cloud == 'aws'
         
-    - name: KAFKA CONNECTOR OVERLAY | building kafka connect host group
+    - name: OPERATIONS OVERLAY (KAFKA CONNECT) | building kafka connect host group
       add_host: hostname="{{ item }}" groupname=kafka_connect ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-{{ application }}-{{ domain }}-private-key.pem"
       with_items: "{{ connect_instances.instances | map(attribute='private_ip_address') | list }}"
       when:
@@ -41,7 +41,7 @@
         - groups['elasticsearch'] is not defined
         - cloud == 'aws'
     
-    - name: KAFKA CONNECTOR OVERLAY | building elasticsearch host group
+    - name: OPERATIONS OVERLAY (KAFKA CONNECT) | building elasticsearch host group
       add_host: hostname="{{ item }}" groupname=elasticsearch ansible_ssh_private_key_file="{{ key_path }}/{{ cloud }}-{{ region }}-{{ project }}-{{ application }}-{{ domain }}-private-key.pem"
       with_items: "{{ elasticsearch_instances.instances|map(attribute='private_ip_address')|list }}"
       when:
@@ -49,18 +49,18 @@
         - elasticsearch_instances.instances | length > 0
 
 # this is necessary before we build host groups from the ansible server
-- name: KAFKA CONNECTOR OVERLAY | discovering source broker facts
+- name: OPERATIONS OVERLAY (KAFKA CONNECT) | discovering source broker facts
   hosts: broker_source
   tasks:
     - setup:
 
 # this is necessary before we build host groups from the ansible server
-- name: KAFKA CONNECTOR OVERLAY | discovering elasticsearch facts
+- name: OPERATIONS OVERLAY (KAFKA CONNECT) | discovering elasticsearch facts
   hosts: broker_destination
   tasks:
     - setup:
 
-- name: KAFKA CONNECTOR OVERLAY | building source and destination broker public internal host groups
+- name: OPERATIONS OVERLAY (KAFKA CONNECT) | building source and destination broker public internal host groups
   hosts: localhost
   gather_facts: no
   tasks:
@@ -75,12 +75,12 @@
       when: "'broker_destination' in groups | default([])"
       
 # this is necessary before we build host groups from the ansible server
-- name: KAFKA CONNECTOR OVERLAY | discovering elasticsearch facts
+- name: OPERATIONS OVERLAY (KAFKA CONNECT) | discovering elasticsearch facts
   hosts: elasticsearch
   tasks:
     - setup:
 
-- name: KAFKA CONNECTOR OVERLAY | building elasticsearch public internal host group
+- name: OPERATIONS OVERLAY (KAFKA CONNECT) | building elasticsearch public internal host group
   hosts: localhost
   gather_facts: no
   tasks:
@@ -90,27 +90,54 @@
       when: "'elasticsearch' in groups | default([])"
 
 # this is necessary before we build host groups from the ansible server
-- name: KAFKA CONNECTOR OVERLAY | discovering connect facts
+- name: OPERATIONS OVERLAY (KAFKA CONNECT) | discovering connect facts
   hosts: kafka_connect
   tasks:
     - setup:
 
-- name: KAFKA CONNECTOR OVERLAY | building elasticsearch public internal host group
+- name: OPERATIONS OVERLAY (KAFKA CONNECT) | building elasticsearch public internal host group
   hosts: localhost
   gather_facts: no
   tasks:
-    - name: KAFKA OVERLAY | building elasticsearch public internal host group
+    - name: OPERATIONS OVERLAY (KAFKA CONNECT) | building elasticsearch public internal host group
       add_host: hostname="{{ hostvars[item].ansible_default_ipv4.address }}" groupname=connect_public
       with_items: "{{ groups['kafka_connect'] }}"
       when: "'kafka_connect' in groups | default([])"
 
-# since we run distributed connectors, we only need register on a single host
-- name: KAFKA CONNECTOR OVERLAY | configuring connectors
-  hosts: kafka_connect[0]
+- name: OPERATIONS OVERLAY (KAFKA CONNECT) | configuring connectors
+  hosts: kafka_connect
   vars_files:
+    - "{{ tenant_config_path }}/config/site.yml"
+    - "{{ tenant_config_path }}/config/applications/shaw.yml"
     - "{{ tenant_config_path }}/config/applications/kafka.yml"
     - "{{ tenant_config_path }}/config/applications/connect.yml"
+    - "{{ tenant_config_path }}/config/applications/confluent.yml"
+    - "{{ tenant_config_path }}/config/applications/apache.yml"
   gather_facts: yes
   tasks:
     - import_role:
         name: connect
+        
+# since we run distributed connectors, we only need register on a single host
+- name: OPERATIONS OVERLAY (KAFKA CONNECT) | configuring connectors
+  hosts: kafka_connect[0]
+  vars_files:
+    - "{{ tenant_config_path }}/config/site.yml"
+    - "{{ tenant_config_path }}/config/applications/shaw.yml"
+    - "{{ tenant_config_path }}/config/applications/kafka.yml"
+    - "{{ tenant_config_path }}/config/applications/connect.yml"
+    - "{{ tenant_config_path }}/config/applications/confluent.yml"
+    - "{{ tenant_config_path }}/config/applications/apache.yml"
+  gather_facts: yes
+  tasks:
+    - include_role:
+        name: connect
+        tasks_from: run-elasticsearch
+    
+    - include_role:
+        name: connect
+        tasks_from: run-tenant
+    
+    - include_role:
+        name: connect
+        tasks_from: run-replicator

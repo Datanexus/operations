@@ -1,0 +1,48 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+# Licensed software not for distribution
+#
+# deploy any replication workers
+---
+- block:
+    
+  - name: OPERATIONS OVERLAY (INSTALL CONNECTORS) | checking running connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
+    uri:
+      url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors"
+      method: GET
+      status_code: 200
+    register: active_connectors
+    when:
+      - groups['connect_public'] | length > 0
+  
+  - name: OPERATIONS OVERLAY (INSTALL CONNECTORS) | stopping http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/replicator
+    uri:
+      url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/replicator"
+      method: DELETE
+      status_code: 204
+      body_format: json
+    when:
+      - groups['connect_public'] | length > 0
+      - '"replicator" in active_connectors.json'
+
+  - name: OPERATIONS OVERLAY (INSTALL CONNECTORS) | waiting for replicator to fully stop
+    pause:
+      seconds: 30
+    when:
+       - '"replicator" in active_connectors.json'
+      
+  # only POST a new connector if the name is unique
+  - name: OPERATIONS OVERLAY (INSTALL CONNECTORS) | creating replication connector on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
+    uri:
+      remote_src: yes
+      url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors"
+      method: POST
+      src: "{{ connect.distributed.config.connector_path }}/{{ tenant }}/connectors/replicator.json"
+      status_code: 201
+      body_format: json
+    when:
+      - groups['connect_public'] | length > 0
+      
+  when:
+    - replication is defined
+    - groups['broker_source'] is defined
+    - groups['broker_destination'] is defined

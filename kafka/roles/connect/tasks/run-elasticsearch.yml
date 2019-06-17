@@ -1,0 +1,138 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+# Licensed software not for distribution
+#
+#
+---
+# deploy any elasticsearch workers
+- block:
+  
+  - name: OPERATIONS OVERLAY (INSTALL CONNECTORS) | checking existing connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
+    uri:
+      url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors"
+      method: GET
+      status_code: 200
+    register: active_connectors
+    when:
+      - groups['connect_public'] | length > 0
+  
+  - name: OPERATIONS OVERLAY (INSTALL CONNECTORS) | stopping http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/es_log_sink
+    uri:
+      url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/es_log_sink"
+      method: DELETE
+      status_code: 204
+      body_format: json
+    when:
+      - groups['connect_public'] | length > 0
+      -  '"es_log_sink" in active_connectors.json'
+  
+  - name: OPERATIONS OVERLAY (INSTALL CONNECTORS) | stopping http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/es_cpu_sink
+    uri:
+      url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/es_cpu_sink"
+      method: DELETE
+      status_code: 204
+      body_format: json
+    when:
+      - groups['connect_public'] | length > 0
+      -  '"es_cpu_sink" in active_connectors.json'
+  
+  - name: OPERATIONS OVERLAY (INSTALL CONNECTORS) | stopping http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/es_disk_sink
+    uri:
+      url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/es_disk_sink"
+      method: DELETE
+      status_code: 204
+      body_format: json
+    when:
+      - groups['connect_public'] | length > 0
+      -  '"es_disk_sink" in active_connectors.json'
+  
+  - name: OPERATIONS OVERLAY (INSTALL CONNECTORS) | stopping http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/es_diskio_sink
+    uri:
+      url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/es_diskio_sink"
+      method: DELETE
+      status_code: 204
+      body_format: json
+    when:
+      - groups['connect_public'] | length > 0
+      -  '"es_diskio_sink" in active_connectors.json'
+  
+  - name: OPERATIONS OVERLAY (INSTALL CONNECTORS) | stopping http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/es_kernel_sink
+    uri:
+      url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/es_kernel_sink"
+      method: DELETE
+      status_code: 204
+      body_format: json
+    when:
+      - groups['connect_public'] | length > 0
+      -  '"es_kernel_sink" in active_connectors.json'
+  
+  - name: OPERATIONS OVERLAY (INSTALL CONNECTORS) | stopping http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/es_mem_sink
+    uri:
+      url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/es_mem_sink"
+      method: DELETE
+      status_code: 204
+      body_format: json
+    when:
+      - groups['connect_public'] | length > 0
+      -  '"es_mem_sink" in active_connectors.json'
+  
+  - name: OPERATIONS OVERLAY (INSTALL CONNECTORS) | stopping http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/es_processes_sink
+    uri:
+      url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/es_processes_sink"
+      method: DELETE
+      status_code: 204
+      body_format: json
+    when:
+      - groups['connect_public'] | length > 0
+      -  '"es_processes_sink" in active_connectors.json'
+
+  - name: OPERATIONS OVERLAY (INSTALL CONNECTORS) | stopping http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/es_swap_sink
+    uri:
+      url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/es_swap_sink"
+      method: DELETE
+      status_code: 204
+      body_format: json
+    when:
+      - groups['connect_public'] | length > 0
+      -  '"es_swap_sink" in active_connectors.json'
+  
+  - name: OPERATIONS OVERLAY (INSTALL CONNECTORS) | stopping http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/es_system_sink
+    uri:
+      url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors/es_system_sink"
+      method: DELETE
+      status_code: 204
+      body_format: json
+    when:
+      - groups['connect_public'] | length > 0
+      -  '"es_system_sink" in active_connectors.json'
+    
+  - name: OPERATIONS OVERLAY (INSTALL CONNECTORS) | waiting for replicators to fully stop
+    pause:
+      seconds: 30
+    when:
+      - ('"es_log_sink" in active_connectors.json') or ('"es_cpu_sink" in active_connectors.json') or ('"es_disk_sink" in active_connectors.json') or ('"es_diskio_sink" in active_connectors.json') or ('"es_kernel_sink" in active_connectors.json') or ('"es_mem_sink" in active_connectors.json') or ('"es_processes_sink" in active_connectors.json') or ('"es_swap_sink" in active_connectors.json') or ('"es_system_sink" in active_connectors.json')
+       
+  # only POST a new connector if the name is unique
+  - name: OPERATIONS OVERLAY (INSTALL CONNECTORS) | creating connectors on http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors
+    uri:
+      remote_src: yes
+      url: "http://{{ groups['connect_public'] | first }}:{{ connect.distributed.config.restPort }}/connectors"
+      method: POST
+      src: "{{ connect.distributed.config.connector_path }}/{{ tenant }}/connectors/{{ item }}.json"
+      status_code: 201
+      body_format: json
+    with_items:
+      - 'es_log_sink'
+      - 'es_cpu_sink'
+      - 'es_disk_sink'
+      - 'es_diskio_sink'
+      - 'es_kernel_sink'
+      - 'es_mem_sink'
+      - 'es_processes_sink'
+      - 'es_swap_sink'
+      - 'es_system_sink'
+    when:
+      - groups['connect_public'] | length > 0
+  
+  when:
+    - groups['elasticsearch'] is defined
+    - groups['elasticsearch'] | length > 0

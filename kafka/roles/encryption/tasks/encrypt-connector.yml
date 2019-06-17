@@ -50,68 +50,69 @@
         ssl.key.password={{ cert.keypass }}
     notify: restart connect
   
-  - name: ENCRYPTION OVERLAY (CONNECT) | enabling SSL for producers
-    blockinfile:
-      path: "{{ connect.distributed.config_file }}"
-      marker: "# producer SSL {mark} ANSIBLE MANAGED BLOCK"
-      insertafter: EOF
-      state: present
-      block: |
-        producer.bootstrap.servers={{ groups['kafka_public'][:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}
-        producer.security.protocol=SSL
-        producer.ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
-        producer.truststore.password={{ cert.storepass }}
-        producer.ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
-        producer.ssl.keystore.password={{ cert.storepass }}
-        producer.ssl.key.password={{ cert.keypass }}
-    notify: restart connect
-    
-  - name: ENCRYPTION OVERLAY (CONNECT) | enabling SSL for consumers
-    blockinfile:
-      path: "{{ connect.distributed.config_file }}"
-      marker: "# consumer SSL {mark} ANSIBLE MANAGED BLOCK"
-      insertafter: EOF
-      state: present
-      block: |
-        consumer.bootstrap.servers={{ groups['kafka_public'][:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}
-        consumer.security.protocol=SSL
-        consumer.ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
-        consumer.truststore.password={{ cert.storepass }}
-        consumer.ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
-        consumer.ssl.keystore.password={{ cert.storepass }}
-        consumer.ssl.key.password={{ cert.keypass }}
-    notify: restart connect
-    
-  - name: ENCRYPTION OVERLAY (CONNECT) | enabling SSL for monitoring producers
-    blockinfile:
-      path: "{{ connect.distributed.config_file }}"
-      marker: "# monitoring producer SSL {mark} ANSIBLE MANAGED BLOCK"
-      insertafter: EOF
-      state: present
-      block: |
-        producer.confluent.monitoring.interceptor.bootstrap.servers={{ groups['kafka_public'][:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}
-        producer.confluent.monitoring.interceptor.security.protocol=SSL
-        producer.confluent.monitoring.interceptor.ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
-        producer.confluent.monitoring.interceptor.ssl.truststore.password={{ cert.storepass }}
-        producer.confluent.monitoring.interceptor.ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
-        producer.confluent.monitoring.interceptor.ssl.keystore.password={{ cert.storepass }}
-        producer.confluent.monitoring.interceptor.ssl.key.password={{ cert.keypass }}
-    notify: restart connect
-
-  - name: ENCRYPTION OVERLAY (CONNECT) | enabling SSL for monitoring consumers
-    blockinfile:
-      path: "{{ connect.distributed.config_file }}"
-      marker: "# monitoring consumer SSL {mark} ANSIBLE MANAGED BLOCK"
-      insertafter: EOF
-      state: present
-      block: |
-        consumer.confluent.monitoring.interceptor.bootstrap.servers={{ groups['kafka_public'][:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}
-        consumer.confluent.monitoring.interceptor.security.protocol=SSL
-        consumer.confluent.monitoring.interceptor.ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
-        consumer.confluent.monitoring.interceptor.ssl.truststore.password={{ cert.storepass }}
-        consumer.confluent.monitoring.interceptor.ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
-        consumer.confluent.monitoring.interceptor.ssl.keystore.password={{ cert.storepass }}
-        consumer.confluent.monitoring.interceptor.ssl.key.password={{ cert.keypass }}
-    notify: restart connect
+  # - name: ENCRYPTION OVERLAY (CONNECT) | enabling SSL for producers
+#     blockinfile:
+#       path: "{{ connect.distributed.config_file }}"
+#       marker: "# producer SSL {mark} ANSIBLE MANAGED BLOCK"
+#       insertafter: EOF
+#       state: present
+#       block: |
+#         producer.bootstrap.servers={{ groups['kafka_public'][:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}
+#         producer.security.protocol=SSL
+#         producer.ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+#         producer.truststore.password={{ cert.storepass }}
+#         producer.ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+#         producer.ssl.keystore.password={{ cert.storepass }}
+#         producer.ssl.key.password={{ cert.keypass }}
+#     notify: restart connect
+#
+#   # consumers for the replica cluster point to the source cluster
+#   - name: ENCRYPTION OVERLAY (CONNECT) | enabling SSL for consumers
+#     blockinfile:
+#       path: "{{ connect.distributed.config_file }}"
+#       marker: "# consumer SSL {mark} ANSIBLE MANAGED BLOCK"
+#       insertafter: EOF
+#       state: present
+#       block: |
+#         consumer.bootstrap.servers={{ (groups['controlcenter_public'] | default(groups['kafka_public']))[:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}
+#         consumer.security.protocol=SSL
+#         consumer.ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+#         consumer.truststore.password={{ cert.storepass }}
+#         consumer.ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+#         consumer.ssl.keystore.password={{ cert.storepass }}
+#         consumer.ssl.key.password={{ cert.keypass }}
+#     notify: restart connect
+#
+#   - name: ENCRYPTION OVERLAY (CONNECT) | enabling SSL for monitoring producers
+#     blockinfile:
+#       path: "{{ connect.distributed.config_file }}"
+#       marker: "# monitoring producer SSL {mark} ANSIBLE MANAGED BLOCK"
+#       insertafter: EOF
+#       state: present
+#       block: |
+#         producer.confluent.monitoring.interceptor.bootstrap.servers={{ groups['kafka_public'][:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}
+#         producer.confluent.monitoring.interceptor.security.protocol=SSL
+#         producer.confluent.monitoring.interceptor.ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+#         producer.confluent.monitoring.interceptor.ssl.truststore.password={{ cert.storepass }}
+#         producer.confluent.monitoring.interceptor.ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+#         producer.confluent.monitoring.interceptor.ssl.keystore.password={{ cert.storepass }}
+#         producer.confluent.monitoring.interceptor.ssl.key.password={{ cert.keypass }}
+#     notify: restart connect
+#
+#   - name: ENCRYPTION OVERLAY (CONNECT) | enabling SSL for monitoring consumers
+#     blockinfile:
+#       path: "{{ connect.distributed.config_file }}"
+#       marker: "# monitoring consumer SSL {mark} ANSIBLE MANAGED BLOCK"
+#       insertafter: EOF
+#       state: present
+#       block: |
+#         consumer.confluent.monitoring.interceptor.bootstrap.servers={{ (groups['controlcenter_public'] | default(groups['kafka_public']))[:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}
+#         consumer.confluent.monitoring.interceptor.security.protocol=SSL
+#         consumer.confluent.monitoring.interceptor.ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+#         consumer.confluent.monitoring.interceptor.ssl.truststore.password={{ cert.storepass }}
+#         consumer.confluent.monitoring.interceptor.ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+#         consumer.confluent.monitoring.interceptor.ssl.keystore.password={{ cert.storepass }}
+#         consumer.confluent.monitoring.interceptor.ssl.key.password={{ cert.keypass }}
+#     notify: restart connect
   
   become: "{{ got_root | default('yes') }}"

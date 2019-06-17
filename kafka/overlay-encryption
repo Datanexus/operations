@@ -107,7 +107,24 @@
       add_host: hostname="{{ hostvars[item].ansible_eth1.ipv4.address }}" groupname=kafka_public
       with_items: "{{ groups['kafka_broker'] }}"
       when: "'kafka_broker' in groups | default([])"
+
+# this is necessary before we build host groups from the ansible server
+- name: ENCRYPTION OVERLAY (KAFKA) | discovering source kafka broker facts
+  hosts: controlcenter_broker
+  tasks:
+    - setup:
       
+- name: ENCRYPTION OVERLAY (KAFKA) | building kafka broker public internal host group
+  hosts: localhost
+  vars_files:
+    - roles/encryption/defaults/main.yml
+  gather_facts: no
+  tasks:
+    - name: ENCRYPTION OVERLAY | building kafka broker public internal host group
+      add_host: hostname="{{ hostvars[item].ansible_eth1.ipv4.address }}" groupname=controlcenter_public
+      with_items: "{{ groups['controlcenter_broker'] }}"
+      when: "'controlcenter_broker' in groups | default([])"
+
 - name: ENCRYPTION OVERLAY (KAFKA) | configuring broker encryption
   hosts: kafka_broker
   vars_files:

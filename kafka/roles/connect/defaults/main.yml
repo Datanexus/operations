@@ -1,152 +1,265 @@
 # configuration variables for kafka distributed connector services
 connect:
   distributed:
-    config_file: /etc/kafka/connect-distributed.properties
-    service_name: confluent-kafka-connect
-    systemd_override: /etc/systemd/system/confluent-kafka-connect.service.d
-    user_service: /usr/local/bin
-    user: cp-kafka-connect
-    group: confluent
+    user_service: "{{ (got_root | default('yes')) | ternary('/usr/local/bin', confluent_root + '/bin')}}"
+    apache:
+      user: kafka
+      group: kafka
+    confluent:
+      config_file: "{{ (got_root | default('yes')) | ternary('/etc/kafka/connect-distributed.properties', (confluent_root + '/confluent-' + confluent.packages.confluent_version + '.' + confluent.packages.minor_release.split('-')[0] + '/etc/kafka/connect-distributed.properties')) }}"
+      service_name: confluent-kafka-connect
+      systemd_override: /etc/systemd/system/confluent-kafka-connect.service.d
+      user: "{{ (got_root | default('yes')) | ternary('cp-kafka-connect', ansible_user) }}"
+      group: "{{ (got_root | default('yes')) | ternary('confluent', ansible_user) }}"
     config:
       restPort: 8083
+      connector_path: "{{ (got_root | default('yes')) | ternary('/etc', (datanexus_root + '/etc')) }}"
     # tune the key converter to the message
     # kafka-console-consumer --bootstrap-server X:9092 --property print.key=true --from-beginning --topic X
-    replicators:
-      - name: replicator
-        config:
-          connector.class: io.confluent.connect.replicator.ReplicatorSourceConnector
-          tasks.max: 4
-          key.converter: io.confluent.connect.replicator.util.ByteArrayConverter
-          value.converter: io.confluent.connect.replicator.util.ByteArrayConverter
-          src.kafka.bootstrap.servers: "{{ broker_source_nodes[:5] | join(':' + broker.config.broker_port + ',') }}:{{ broker.config.broker_port }}"
-          dest.kafka.bootstrap.servers: "{{ broker_destination_nodes[:5] | join(':' + broker.config.broker_port + ',') }}:{{ broker.config.broker_port }}"
-          topic.whitelist: "{{ replication_topics | join(',') }}"
-          topic.rename.format: ${topic}
-          src.consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
-    elasticsearch:
-      - name: es_log_sink
-        config:
-          connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
-          tasks.max: 1
-          topics: telegraf_log
-          topic.index.map: telegraf_log:log_index
-          connection.url: "http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}"
-          type.name: true
-          key.ignore: true
-          schema.ignore: true
-          schemas.enable: false
-          key.converter: org.apache.kafka.connect.storage.StringConverter
-          consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
-      - name: es_cpu_sink
-        config:
-          connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
-          tasks.max: 1
-          topics: telegraf_cpu
-          topic.index.map: telegraf_cpu:cpu_index
-          connection.url: "http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}"
-          type.name: true
-          key.ignore: true
-          schema.ignore: true
-          schemas.enable: false
-          key.converter: org.apache.kafka.connect.storage.StringConverter
-          consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
-      - name: es_disk_sink
-        config:
-          connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
-          tasks.max: 1
-          topics: telegraf_disk
-          topic.index.map: telegraf_disk:disk_index
-          connection.url: "http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}"
-          type.name: true
-          key.ignore: true
-          schema.ignore: true
-          schemas.enable: false
-          key.converter: org.apache.kafka.connect.storage.StringConverter
-          consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
-      - name: es_diskio_sink
-        config:
-          connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
-          tasks.max: 1
-          topics: telegraf_diskio
-          topic.index.map: telegraf_diskio:diskio_index
-          connection.url: "http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}"
-          type.name: true
-          key.ignore: true
-          schema.ignore: true
-          schemas.enable: false
-          key.converter: org.apache.kafka.connect.storage.StringConverter
-          consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
-      - name: es_kernel_sink
-        config:
-          connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
-          tasks.max: 1
-          topics: telegraf_kernel
-          topic.index.map: telegraf_kernel:kernel_index
-          connection.url: "http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}"
-          type.name: true
-          key.ignore: true
-          schema.ignore: true
-          schemas.enable: false
-          key.converter: org.apache.kafka.connect.storage.StringConverter
-          consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
-      - name: es_mem_sink
-        config:
-          connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
-          tasks.max: 1
-          topics: telegraf_mem
-          topic.index.map: telegraf_mem:mem_index
-          connection.url: "http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}"
-          type.name: true
-          key.ignore: true
-          schema.ignore: true
-          schemas.enable: false
-          key.converter: org.apache.kafka.connect.storage.StringConverter
-          consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
-      - name: es_processes_sink
-        config:
-          connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
-          tasks.max: 1
-          topics: telegraf_processes
-          topic.index.map: telegraf_processes:processes_index
-          connection.url: "http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}"
-          type.name: true
-          key.ignore: true
-          schema.ignore: true
-          schemas.enable: false
-          key.converter: org.apache.kafka.connect.storage.StringConverter
-          consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
-      - name: es_swap_sink
-        config:
-          connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
-          tasks.max: 1
-          topics: telegraf_swap
-          topic.index.map: telegraf_swap:swap_index
-          connection.url: "http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}"
-          type.name: true
-          key.ignore: true
-          schema.ignore: true
-          schemas.enable: false
-          key.converter: org.apache.kafka.connect.storage.StringConverter
-          consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
-      - name: es_system_sink
-        config:
-          connector.class: io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
-          tasks.max: 1
-          topics: telegraf_system
-          topic.index.map: telegraf_system:system_index
-          connection.url: "http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}"
-          type.name: true
-          key.ignore: true
-          schema.ignore: true
-          schemas.enable: false
-          key.converter: org.apache.kafka.connect.storage.StringConverter
-          consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
+    replicator:
+      payload: |
+        "name":"replicator",
+          "config":{
+            "connector.class":"io.confluent.connect.replicator.ReplicatorSourceConnector",
+            "tasks.max":2,
+            "src.consumer.interceptor.classes":"io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor",
+            "topic.rename.format":"${topic}_replica",
+            "topic.whitelist":"{{ replication_topics | join(',') }}",
+            "key.converter":"io.confluent.connect.replicator.util.ByteArrayConverter",
+            "value.converter":"io.confluent.connect.replicator.util.ByteArrayConverter",
+            "dest.kafka.bootstrap.servers":"{{ broker_destination_nodes[:5] | join(':' + broker.config.broker_port + ',') }}:{{ broker.config.broker_port }}",
+            "src.kafka.bootstrap.servers":"{{ broker_source_nodes[:5] | join(':' + broker.config.broker_port + ',') }}:{{ broker.config.broker_port }}"
+          }
+          # - name: replicator
+    #         config:
+    #           tasks.max: 2
+    #           connector.class: io.confluent.connect.replicator.ReplicatorSourceConnector
+    #           topic.whitelist: "{{ replication_topics | join(',') }}"
+    #           topic.rename.format: ${topic}_replica
+    #           key.converter: io.confluent.connect.replicator.util.ByteArrayConverter
+    #           value.converter: io.confluent.connect.replicator.util.ByteArrayConverter
+    #           dest.kafka.bootstrap.servers: "{{ broker_destination_nodes[:5] | join(':' + broker.config.broker_port + ',') }}:{{ broker.config.broker_port }}"
+    #           # dest.kafka.security.protocol: SSL
+    #  #          dest.kafka.ssl.truststore.location: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks"
+    #  #          dest.kafka.ssl.truststore.password: "{{ cert.storepass }}"
+    #  #          dest.kafka.ssl.keystore.location: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks"
+    #  #          dest.kafka.ssl.keystore.password: "{{ cert.storepass }}"
+    #  #          dest.kafka.ssl.key.password: "{{ cert.keypass }}"
+    #           # CNK we need to un-hard code the SSL port and make it work for either port as in other places
+    #           src.kafka.bootstrap.servers: "{{ broker_source_nodes[:5] | join(':' + broker.config.broker_port + ',') }}:{{ broker.config.broker_port }}"
+    #           # src.kafka.security.protocol: SSL
+    #  #          src.kafka.ssl.truststore.location: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks"
+    #  #          src.kafka.ssl.truststore.password: "{{ cert.storepass }}"
+    #  #          src.kafka.ssl.keystore.location: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks"
+    #  #          src.kafka.ssl.keystore.password: "{{ cert.storepass }}"
+    #  #          src.kafka.ssl.key.password: "{{ cert.keypass }}"
+    #           # src.consumer.group.id: connect-replicator
+    #           src.zookeeper.connect: "{{ (groups['zookeeper_source'] | default(groups['zookeeper'])) | join(':' + zookeeper.config.port + ',') }}:{{ zookeeper.config.port }}"
+    #           dest.zookeeper.connect: "{{ (groups['zookeeper_destination']  | default(groups['zookeeper']))| join(':' + zookeeper.config.port + ',') }}:{{ zookeeper.config.port }}"
+    #           # SSL topic creation
+    #           # confluent.topic.replication.factor: 3
+    #  #          confluent.topic.security.protocol: SSL
+    #  #          confluent.topic.bootstrap.servers: "{{ broker_destination_nodes[:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}"
+    #  #          confluent.topic.ssl.truststore.location: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks"
+    #  #          confluent.topic.ssl.truststore.password: "{{ cert.storepass }}"
+    #  #          confluent.topic.ssl.keystore.location: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks"
+    #  #          confluent.topic.ssl.keystore.password: "{{ cert.storepass }}"
+    #  #          confluent.topic.ssl.key.password: "{{ cert.keypass }}"
+    #           # these monitoring lines are defined https://github.com/confluentinc/cp-demo/blob/5.2.1-post/scripts/connectors/submit_replicator_config.sh
+    #           src.consumer.interceptor.classes: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
+    #  #          src.consumer.confluent.monitoring.interceptor.security.protocol: SSL
+    #  #          src.consumer.confluent.monitoring.interceptor.bootstrap.servers: "{{ broker_source_nodes[:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}"
+    #  #          src.consumer.confluent.monitoring.interceptor.ssl.key.password: "{{ cert.keypass }}"
+    #  #          src.consumer.confluent.monitoring.interceptor.ssl.truststore.location: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks"
+    #  #          src.consumer.confluent.monitoring.interceptor.ssl.truststore.password: "{{ cert.storepass }}"
+    #  #          src.consumer.confluent.monitoring.interceptor.ssl.keystore.location: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks"
+    #  #          src.consumer.confluent.monitoring.interceptor.ssl.keystore.password: "{{ cert.storepass }}"
+    #           # consumer.bootstrap.servers: "{{ broker_destination_nodes[:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}"
+    # #           consumer.security.protocol: SSL
+    # #           consumer.ssl.truststore.location: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks"
+    # #           consumer.truststore.password: "{{ cert.storepass }}"
+    # #           consumer.ssl.keystore.location: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks"
+    # #           consumer.ssl.keystore.password: "{{ cert.storepass }}"
+    # #           consumer.ssl.key.password: "{{ cert.keypass }}"
+    # #           producer.bootstrap.servers: "{{ broker_source_nodes[:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}"
+    # #           producer.security.protocol: SSL
+    # #           producer.ssl.truststore.location: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks"
+    # #           producer.truststore.password: "{{ cert.storepass }}"
+    # #           producer.ssl.keystore.location: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks"
+    # #           producer.ssl.keystore.password: "{{ cert.storepass }}"
+    # #           producer.ssl.key.password: "{{ cert.keypass }}"
+    #           # producer.confluent.monitoring.interceptor.bootstrap.servers: "{{ broker_destination_nodes[:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}"
+    #           # producer.confluent.monitoring.interceptor.security.protocol: SSL
+    #           # producer.confluent.monitoring.interceptor.ssl.truststore.location: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks"
+    #           # producer.confluent.monitoring.interceptor.ssl.truststore.password: "{{ cert.storepass }}"
+    #           # producer.confluent.monitoring.interceptor.ssl.keystore.location: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks"
+    #           # producer.confluent.monitoring.interceptor.ssl.keystore.password: "{{ cert.storepass }}"
+    #           # producer.confluent.monitoring.interceptor.ssl.key.password: "{{ cert.keypass }}"
+    es_log_sink:
+      payload: |
+        "name":"es_log_sink",
+          "config":{
+            "connector.class":"io.confluent.connect.elasticsearch.ElasticsearchSinkConnector",
+            "tasks.max":1,
+            "topics":"telegraf_log",
+            "topic.index.map":"telegraf_log:log_index",
+            "connection.url":"http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}",
+            "type.name":"true",
+            "key.ignore":"true",
+            "schema.ignore":"true",
+            "schemas.enable":"false",
+            "key.converter":"org.apache.kafka.connect.storage.StringConverter",
+            "consumer.interceptor.classes":"io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor"
+          }
+    es_cpu_sink:
+      payload: |
+        "name":"es_cpu_sink",
+          "config":{
+            "connector.class":"io.confluent.connect.elasticsearch.ElasticsearchSinkConnector",
+            "tasks.max":1,
+            "topics":"telegraf_cpu",
+            "topic.index.map":"telegraf_cpu:cpu_index",
+            "connection.url":"http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}",
+            "type.name":"true",
+            "key.ignore":"true",
+            "schema.ignore":"true",
+            "schemas.enable":"false",
+            "key.converter":"org.apache.kafka.connect.storage.StringConverter",
+            "consumer.interceptor.classes":"io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor"
+          }
+    es_disk_sink:
+      payload: |
+        "name":"es_disk_sink",        
+          "config":{
+            "connector.class":"io.confluent.connect.elasticsearch.ElasticsearchSinkConnector",
+            "tasks.max":1,
+            "topics":"telegraf_disk",
+            "topic.index.map":"telegraf_disk:disk_index",
+            "connection.url":"http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}",
+            "type.name":"true",
+            "key.ignore":"true",
+            "schema.ignore":"true",
+            "schemas.enable":"false",
+            "key.converter":"org.apache.kafka.connect.storage.StringConverter",
+            "consumer.interceptor.classes":"io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor"
+          }
+    es_diskio_sink:
+      payload: |
+        "name":"es_diskio_sink",
+          "config":{
+            "connector.class":"io.confluent.connect.elasticsearch.ElasticsearchSinkConnector",
+            "tasks.max":1,
+            "topics":"telegraf_diskio",
+            "topic.index.map":"telegraf_diskio:diskio_index",
+            "connection.url":"http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}",
+            "type.name":"true",
+            "key.ignore":"true",
+            "schema.ignore":"true",
+            "schemas.enable":"false",
+            "key.converter":"org.apache.kafka.connect.storage.StringConverter",
+            "consumer.interceptor.classes":"io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor"
+          }
+    es_kernel_sink:
+      payload: |
+        "name":"es_kernel_sink",
+          "config":{
+            "connector.class":"io.confluent.connect.elasticsearch.ElasticsearchSinkConnector",
+            "tasks.max":1,
+            "topics":"telegraf_kernel",
+            "topic.index.map":"telegraf_kernel:kernel_index",
+            "connection.url":"http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}",
+            "type.name":"true",
+            "key.ignore":"true",
+            "schema.ignore":"true",
+            "schemas.enable":"false",
+            "key.converter":"org.apache.kafka.connect.storage.StringConverter",
+            "consumer.interceptor.classes":"io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor"
+          }
+    es_mem_sink:
+      payload: |
+        "name":"es_mem_sink",
+          "config":{
+            "connector.class":"io.confluent.connect.elasticsearch.ElasticsearchSinkConnector",
+            "tasks.max":1,
+            "topics":"telegraf_mem",
+            "topic.index.map":"telegraf_mem:mem_index",
+            "connection.url":"http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}",
+            "type.name":"true",
+            "key.ignore":"true",
+            "schema.ignore":"true",
+            "schemas.enable":"false",
+            "key.converter":"org.apache.kafka.connect.storage.StringConverter",
+            "consumer.interceptor.classes":"io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor"
+          }
+    es_processes_sink:
+      payload: |
+        "name":"es_processes_sink",
+          "config":{
+            "connector.class":"io.confluent.connect.elasticsearch.ElasticsearchSinkConnector",
+            "tasks.max":1,
+            "topics":"telegraf_processes",
+            "topic.index.map":"telegraf_processes:processes_index",
+            "connection.url":"http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}",
+            "type.name":"true",
+            "key.ignore":"true",
+            "schema.ignore":"true",
+            "schemas.enable":"false",
+            "key.converter":"org.apache.kafka.connect.storage.StringConverter",
+            "consumer.interceptor.classes":"io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor"
+          }
+    es_swap_sink:
+      payload: |
+        "name":"es_swap_sink",
+          "config":{
+            "connector.class":"io.confluent.connect.elasticsearch.ElasticsearchSinkConnector",
+            "tasks.max":1,
+            "topics":"telegraf_swap",
+            "topic.index.map":"telegraf_swap:swap_index",
+            "connection.url":"http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}",
+            "type.name":"true",
+            "key.ignore":"true",
+            "schema.ignore":"true",
+            "schemas.enable":"false",
+            "key.converter":"org.apache.kafka.connect.storage.StringConverter",
+            "consumer.interceptor.classes":"io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor"
+          }
+    es_system_sink:
+      payload: |
+        "name":"es_system_sink",
+          "config":{
+            "connector.class":"io.confluent.connect.elasticsearch.ElasticsearchSinkConnector",
+            "tasks.max":1,
+            "topics":"telegraf_system",
+            "topic.index.map":"telegraf_system:system_index",
+            "connection.url":"http://{{ elasticsearch_node }}:{{ elasticsearch.config.restPort }}",
+            "type.name":"true",
+            "key.ignore":"true",
+            "schema.ignore":"true",
+            "schemas.enable":"false",
+            "key.converter":"org.apache.kafka.connect.storage.StringConverter",
+            "consumer.interceptor.classes":"io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor"
+          }
+shaw:
+  config:
+    tls_path: "{{ (got_root | default('yes')) | ternary('/etc/tls', (datanexus_root + '/datanexus/tls')) }}"
+zookeeper:
+  config:
+    port: '2181'
 broker:
-   config:
-     # if this gets changed it needs to be changed under kafka defaults
-     broker_port: '9092'
+  application: kafka_broker
+  config:
+    # if this gets changed it needs to be changed under kafka defaults
+    broker_port: '9092'
+    sslPort: '9091'
 elasticsearch:
   config:
     # this needs to be quoted as a string for concatenation purposes
     # if this gets changed it needs to be changed under connect defaults
     restPort: '9200'
+confluent:
+  packages:
+    confluent_version: '5.1'
+    minor_release: '0'
+    scala_version: '2.11'
+    # kafka_version isn't used under confluent, here mainly to match apache
+    kafka_version: '2.1'

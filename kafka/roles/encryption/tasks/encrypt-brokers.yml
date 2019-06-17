@@ -178,11 +178,10 @@
     lineinfile:
       path: "{{ broker.config_file }}"
       regexp: '^confluent.metrics.reporter.bootstrap.servers='
-      line: "confluent.metrics.reporter.bootstrap.servers={{ groups['kafka_public'][:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}"
+      line: "confluent.metrics.reporter.bootstrap.servers={{ (groups['controlcenter_public'] | default(groups['kafka_public']))[:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}"
       insertafter: '^#confluent.metrics.reporter.bootstrap.servers='
     when:
-      - groups['controlcenter'] is defined
-      - groups['controlcenter'] | length > 0
+      - groups['controlcenter'] is defined or groups['controlcenter_broker'] is defined
     notify: restart broker
     
   - name: ENCRYPTION OVERLAY (BROKER) | configuring SSL for metrics reporting
@@ -199,8 +198,7 @@
         confluent.metrics.reporter.ssl.keystore.password={{ cert.storepass }}
         confluent.metrics.reporter.ssl.key.password={{ cert.keypass }}
     when:
-      - groups['controlcenter'] is defined
-      - groups['controlcenter'] | length > 0
+      - groups['controlcenter'] is defined or groups['controlcenter_broker'] is defined
     notify: restart broker
       
   become: "{{ got_root | default('yes') }}"

@@ -95,11 +95,11 @@
   tasks:
     - setup:
 
-- name: OPERATIONS OVERLAY (KAFKA CONNECT) | building elasticsearch public internal host group
+- name: OPERATIONS OVERLAY (KAFKA CONNECT) | building kafka connect public internal host group
   hosts: localhost
   gather_facts: no
   tasks:
-    - name: OPERATIONS OVERLAY (KAFKA CONNECT) | building elasticsearch public internal host group
+    - name: OPERATIONS OVERLAY (KAFKA CONNECT) | building kafka connect public internal host group
       add_host: hostname="{{ hostvars[item].ansible_default_ipv4.address }}" groupname=connect_public
       with_items: "{{ groups['kafka_connect'] }}"
       when: "'kafka_connect' in groups | default([])"

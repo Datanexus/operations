@@ -129,7 +129,7 @@ connect:
           }
     es_disk_sink:
       payload: |
-        "name":"es_disk_sink",        
+        "name":"es_disk_sink",
           "config":{
             "connector.class":"io.confluent.connect.elasticsearch.ElasticsearchSinkConnector",
             "tasks.max":1,

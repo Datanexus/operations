@@ -5,8 +5,30 @@
 ---
 - import_tasks: interface-facts.yml
 
+# these facts basically let us handle both apache and confluent
+- set_fact:
+    broker_user: "{{ (apache_kafka) | ternary(broker.apache.user, broker.confluent.user) }}"
+
+- set_fact:
+     broker_group: "{{ (apache_kafka) | ternary(broker.apache.group, broker.confluent.group) }}"
+
+- set_fact:
+    broker_service_name: "{{ (apache_kafka) | ternary(broker.apache.service_name, broker.confluent.service_name) }}"
+
+- set_fact:
+    broker_config_file: "{{ (apache_kafka) | ternary(broker.apache.config_file, broker.confluent.config_file) }}"
+
+- set_fact:
+    broker_path: "{{ (got_root | default('yes')) | ternary('/usr/bin', (confluent_root + '/confluent-' + confluent.packages.confluent_version + '.' + confluent.packages.minor_release.split('-')[0] + '/bin')) }}"
+
+- set_fact:
+    connect_user: "{{ (apache_kafka) | ternary(connect.distributed.apache.user, connect.distributed.confluent.user) }}"
+
+- set_fact:
+     connect_group: "{{ (apache_kafka) | ternary(connect.distributed.apache.group, connect.distributed.confluent.group) }}"
+
 - block:
-  
+
   - name: ENCRYPTION OVERLAY (BROKER) | checking {{ shaw.config.tls_path }}/{{ tenant }}/ca for {{ broker.application }} TLS
     stat:
       path: "{{ shaw.config.tls_path }}/{{ tenant }}/ca"
@@ -18,7 +40,7 @@
       state: directory
       mode: 0755
     when: not ca_dir.stat.exists
-    
+
   - name: ENCRYPTION OVERLAY (BROKER) | checking existing {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}
     stat:
       path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
@@ -29,10 +51,10 @@
       path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
       state: directory
       mode: 0755
-      owner: "{{ broker.user }}"
-      group: "{{ broker.group }}"
+      owner: "{{ broker_user }}"
+      group: "{{ broker_group }}"
     when: not kafka_server_key.stat.exists
-  
+
   - name: ENCRYPTION OVERLAY (BROKER) | removing existing CA credentials 
     file:
       path: "{{ shaw.config.tls_path }}/{{ tenant }}/ca/{{ item }}"
@@ -42,7 +64,7 @@
       - ca-key
       - ca-cert.srl
     when: regenerate_certs
-      
+
   - name: ENCRYPTION OVERLAY (BROKER) | checking existing {{ shaw.config.tls_path }}/{{ tenant }}/ca/ca-cert
     stat:
       path: "{{ shaw.config.tls_path }}/{{ tenant }}/ca/ca-cert"
@@ -52,8 +74,8 @@
     copy:
       src: "{{ item }}"
       dest: "{{ shaw.config.tls_path }}/{{ tenant }}/ca/"
-      owner: "{{ broker.user }}"
-      group: "{{ broker.group }}"
+      owner: "{{ broker_user }}"
+      group: "{{ broker_group }}"
       mode: 0600
     with_items:
       - "{{ key_path }}/ca-cert"
@@ -136,27 +158,27 @@
   - import_tasks: generate-client.yml
     vars:
       client_name: BROKER
-      client_owner: "{{ connect.distributed.user }}"
-      client_group: "{{ connect.distributed.group }}"
+      client_owner: "{{ connect_user }}"
+      client_group: "{{ connect_group }}"
       client_handler: broker
-      
+
   - name: ENCRYPTION OVERLAY (BROKER) | configuring SSL listeners
     replace:
-      path: "{{ broker.config_file }}"
+      path: "{{ broker_config_file }}"
       regexp: '^listeners=PLAINTEXT://{{ kafka_interface_ipv4 }}:{{ broker.config.port }}$'
       replace: "listeners=SSL://{{ kafka_interface_ipv4 }}:{{ broker.config.sslPort }}"
     notify: restart broker
 
   - name: ENCRYPTION OVERLAY (BROKER) | defaulting advertised listens to SSL
     replace:
-      path: "{{ broker.config_file }}"
+      path: "{{ broker_config_file }}"
       regexp: '^advertised.listeners=PLAINTEXT://{{ kafka_interface_ipv4 }}:{{ broker.config.port }}$'
       replace: "advertised.listeners=SSL://{{ kafka_interface_ipv4 }}:{{ broker.config.sslPort }}"
     notify: restart broker
     
   - name: ENCRYPTION OVERLAY (BROKER) | enabling SSL for internode communication
     blockinfile:
-      path: "{{ broker.config_file }}"
+      path: "{{ broker_config_file }}"
       marker: "# {{ broker.application }} SSL {mark} ANSIBLE MANAGED BLOCK"
       insertafter: EOF
       state: present
@@ -176,17 +198,17 @@
   # cap number of brokers in config at 5
   - name: ENCRYPTION OVERLAY (BROKER) | updating control center metrics bootstrap servers for {{ broker.service_name }}
     lineinfile:
-      path: "{{ broker.config_file }}"
+      path: "{{ broker_config_file }}"
       regexp: '^confluent.metrics.reporter.bootstrap.servers='
       line: "confluent.metrics.reporter.bootstrap.servers={{ (groups['controlcenter_public'] | default(groups['kafka_public']))[:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}"
       insertafter: '^#confluent.metrics.reporter.bootstrap.servers='
     when:
       - groups['controlcenter'] is defined or groups['controlcenter_broker'] is defined
     notify: restart broker
-    
+
   - name: ENCRYPTION OVERLAY (BROKER) | configuring SSL for metrics reporting
     blockinfile:
-      path: "{{ broker.config_file }}"
+      path: "{{ broker_config_file }}"
       marker: "# metrics SSL {mark} ANSIBLE MANAGED BLOCK"
       insertafter: EOF
       state: present
@@ -200,5 +222,22 @@
     when:
       - groups['controlcenter'] is defined or groups['controlcenter_broker'] is defined
     notify: restart broker
-      
+
+  - name: ENCRYPTION OVERLAY (BROKER) | configuring SSL for metrics reporting
+    blockinfile:
+      path: "{{ broker_config_file }}"
+      marker: "# metrics SSL {mark} ANSIBLE MANAGED BLOCK"
+      insertafter: EOF
+      state: present
+      block: |
+        cruise.control.metrics.reporter.security.protocol=SSL
+        cruise.control.metrics.reporter.ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+        cruise.control.metrics.reporter.ssl.truststore.password={{ cert.storepass }}
+        cruise.control.metrics.reporter.ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+        cruise.control.metrics.reporter.ssl.keystore.password={{ cert.storepass }}
+        cruise.control.metrics.reporter.ssl.key.password={{ cert.keypass }}
+    when:
+      - groups['cruisecontrol'] is defined or groups['cruisecontrol_broker'] is defined
+    notify: restart broker
+
   become: "{{ got_root | default('yes') }}"

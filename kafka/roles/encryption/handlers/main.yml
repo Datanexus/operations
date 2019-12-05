@@ -14,7 +14,7 @@
 - name: systemd broker
   listen: "restart broker"
   systemd:
-    name: "{{ broker.service_name }}"
+    name: "{{ broker_service_name }}"
     state: restarted
   become: yes
   when:
@@ -25,7 +25,7 @@
 - name: sysvinit broker
   listen: "restart broker"
   sysvinit:
-    name: "{{ broker.service_name }}"
+    name: "{{ broker_service_name }}"
     state: restarted
   become: yes
   when:
@@ -98,7 +98,7 @@
 - name: systemd connect
   listen: "restart connect"
   systemd:
-    name: "{{ connect.distributed.service_name  }}"
+    name: "{{ connect_service_name }}"
     state: restarted
   become: yes
   when:
@@ -109,7 +109,7 @@
 - name: sysvinit connect
   listen: "restart connect"
   sysvinit:
-    name: "{{ connect.distributed.service_name  }}"
+    name: "{{ connect_service_name }}"
     state: restarted
   become: yes
   when:
@@ -178,3 +178,26 @@
   command: "{{ kafkarest.user_service }}/confluent-kafka-rest restart"
   when:
     - not got_root
+
+- name: systemd cruisecontrol
+  listen: "restart cruisecontrol"
+  systemd:
+    name: "{{ cruisecontrol.service_name }}"
+    state: restarted
+  become: yes
+  when:
+    - got_root | default('yes')
+    - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - ansible_distribution_version is version_compare('7', '>=')
+
+- name: sysvinit cruisecontrol
+  listen: "restart cruisecontrol"
+  command: "./{{ cruisecontrol.service_name}} restart"
+  become: yes
+  args:
+    chdir: "{{ cruisecontrol.user_service  }}"
+  become_user: "{{ cruisecontrol_user }}"
+  when:
+    - got_root | default('yes')
+    - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - ansible_distribution_version is version_compare('7', '<')

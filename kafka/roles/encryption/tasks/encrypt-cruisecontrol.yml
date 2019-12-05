@@ -1,0 +1,53 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+# Licensed software not for distribution
+#
+# enable cruise control encryption
+---
+- block:
+  
+  - name: ENCRYPTION OVERLAY (CRUISE CONTROL) | checking existing server keystore
+    stat:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
+    register: kafka_server_key
+  
+  - name: ENCRYPTION OVERLAY (CRUISE CONTROL) | ensure TLS {{ broker.application }} directory is present
+    file:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
+      state: directory
+      mode: 0755
+      owner: "{{ cruisecontrol.user }}"
+      group: "{{ cruisecontrol.group }}"
+    when: not kafka_server_key.stat.exists
+
+  - import_tasks: generate-client.yml
+    vars:
+      client_name: 'CRUISE CONTROL'
+      client_owner: "{{ cruisecontrol.user }}"
+      client_group: "{{ cruisecontrol.group }}"
+      client_handler: cruisecontrol
+  
+  # cap number of brokers in config at 5
+  - name: ENCRYPTION OVERLAY (CRUISE CONTROL) | configuring bootstrap servers
+    lineinfile:
+      path: "{{ cruisecontrol.config_file }}"
+      regexp: '^bootstrap.servers='
+      line: "bootstrap.servers={{ groups['kafka_public'][:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}"
+      insertafter: '^#bootstrap.servers='
+    notify: restart cruisecontrol
+  
+  - name: ENCRYPTION OVERLAY (CRUISE CONTROL) | enabling SSL
+    blockinfile:
+      path: "{{ cruisecontrol.config_file }}"
+      marker: "# connect SSL {mark} ANSIBLE MANAGED BLOCK"
+      insertafter: EOF
+      state: present
+      block: |
+        security.protocol=SSL
+        ssl.truststore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.truststore.jks
+        ssl.truststore.password={{ cert.storepass }}
+        ssl.keystore.location={{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks
+        ssl.keystore.password={{ cert.storepass }}
+        ssl.key.password={{ cert.keypass }}
+    notify: restart cruisecontrol
+    
+  become: "{{ got_root | default('yes') }}"

@@ -7,34 +7,34 @@ apache:
   packages:
     epel_version: '7-11'
     java_version: '1.8.0'
-    kafka_version: '2.1.1'
+    kafka_version: '2.3.1'
     scala_version: '2.12'
   install_dir: /usr/local
-  user: kafka
-  group: kafka
-  config_file: server.properties
 confluent:
   packages:
     epel_version: '7-11'
     java_version: '1.8.0'
-    confluent_version: '5.1'
+    confluent_version: '5.3'
     minor_release: '0'
-    scala_version: '2.11'
-    # confluent_version: '5.2'
-    # minor_release: '1'
-    # scala_version: '2.12'
+    scala_version: '2.12'
     # kafka_version isn't used under confluent, here mainly to match apache
-    kafka_version: '2.1'
+    kafka_version: '2.3.1'
 shaw:
   config:
     tls_path: "{{ (got_root | default('yes')) | ternary('/etc/tls', (datanexus_root + '/datanexus/tls')) }}"
 broker:
+  apache:
+    user: kafka
+    group: kafka
+    service_name: apache-kafka
+    config_file: "{{ apache.install_dir }}/kafka_{{ apache.packages.scala_version }}-{{ apache.packages.kafka_version }}/config/server.properties"
+  confluent:
+    user: "{{ (got_root | default('yes')) | ternary('cp-kafka', ansible_user) }}"
+    group: "{{ (got_root | default('yes')) | ternary('confluent', ansible_user) }}"
+    service_name: confluent-kafka
+    config_file: "{{ (got_root | default('yes')) | ternary('/etc/kafka/server.properties', (confluent_root + '/confluent-' + confluent.packages.confluent_version + '.' + confluent.packages.minor_release.split('-')[0] + '/etc/kafka/server.properties')) }}"
   application: kafka_broker
-  user: "{{ (got_root | default('yes')) | ternary('cp-kafka', ansible_user) }}"
-  group: "{{ (got_root | default('yes')) | ternary('confluent', ansible_user) }}"
-  service_name: confluent-kafka
   user_service: "{{ (got_root | default('yes')) | ternary('/usr/local/bin', confluent_root + '/bin')}}"
-  config_file: "{{ (got_root | default('yes')) | ternary('/etc/kafka/server.properties', (confluent_root + '/confluent-' + confluent.packages.confluent_version + '.' + confluent.packages.minor_release.split('-')[0] + '/etc/kafka/server.properties')) }}"
   config:
     port: '9092'
     sslPort: '9091'
@@ -44,11 +44,17 @@ zookeeper:
     port: '2181'
 connect:
   distributed:
-    config_file: "{{ (got_root | default('yes')) | ternary('/etc/kafka/connect-distributed.properties', (confluent_root + '/confluent-' + confluent.packages.confluent_version + '.' + confluent.packages.minor_release.split('-')[0] + '/etc/kafka/connect-distributed.properties')) }}"
-    service_name: confluent-kafka-connect
+    apache:
+      config_file: "{{ apache.install_dir }}/kafka_{{ apache.packages.scala_version }}-{{ apache.packages.kafka_version }}/config/connect-distributed.properties"
+      user: kafka
+      group: kafka
+      service_name: apache-kafka-connect
+    confluent:
+      config_file: "{{ (got_root | default('yes')) | ternary('/etc/kafka/connect-distributed.properties', (confluent_root + '/confluent-' + confluent.packages.confluent_version + '.' + confluent.packages.minor_release.split('-')[0] + '/etc/kafka/connect-distributed.properties')) }}"
+      user: "{{ (got_root | default('yes')) | ternary('cp-kafka-connect', ansible_user) }}"
+      group: "{{ (got_root | default('yes')) | ternary('confluent', ansible_user) }}"
+      service_name: confluent-kafka-connect
     user_service: "{{ (got_root | default('yes')) | ternary('/usr/local/bin', confluent_root + '/bin')}}"
-    user: "{{ (got_root | default('yes')) | ternary('cp-kafka-connect', ansible_user) }}"
-    group: "{{ (got_root | default('yes')) | ternary('confluent', ansible_user) }}"
 schema:
   registry:
     user: "{{ (got_root | default('yes')) | ternary('cp-schema-registry', ansible_user) }}"
@@ -65,6 +71,12 @@ control:
     config_file: "{{ (got_root | default('yes')) | ternary('/etc/confluent-control-center/control-center-production.properties', (confluent_root + '/confluent-' + confluent.packages.confluent_version + '.' + confluent.packages.minor_release.split('-')[0] + '/etc/confluent-control-center/control-center-production.properties')) }}"
     service_name: confluent-control-center
     user_service: "{{ (got_root | default('yes')) | ternary('/usr/local/bin', confluent_root + '/bin')}}"
+cruisecontrol:
+  config_file: /usr/local/src/cruise-control/config/cruisecontrol.properties
+  user: "{{ (apache_kafka) | ternary('kafka', 'cp-kafka') }}"
+  group: "{{ (apache_kafka) | ternary('kafka', 'confluent') }}"
+  service_name: cruise-control
+  user_service: /usr/local/bin
 ksql:
   config_file: "{{ (got_root | default('yes')) | ternary('/etc/ksql/ksql-server.properties', (confluent_root + '/confluent-' + confluent.packages.confluent_version + '.' + confluent.packages.minor_release.split('-')[0] + '/etc/ksql/ksql-server.properties')) }}"
   service_name: confluent-ksql

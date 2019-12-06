@@ -1,0 +1,40 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+# Licensed software not for distribution
+#
+# enables zookeeper to have keystores
+---
+# these facts basically let us handle both apache and confluent
+- set_fact:
+    zookeeper_user: "{{ (apache_kafka) | ternary(zookeeper.apache.user, zookeeper.confluent.user) }}"
+
+- set_fact:
+    zookeeper_group: "{{ (apache_kafka) | ternary(zookeeper.apache.group, zookeeper.confluent.group) }}"
+
+# it's not necessary to bounce zookeeper as it's not encrypted, but we need this for the generate-client code
+- set_fact:
+    zookeeper_service_name: "{{ (apache_kafka) | ternary(zookeeper.apache.service_name, zookeeper.confluent.service_name) }}"
+    
+- block:
+
+  - name: ENCRYPTION OVERLAY (ZOOKEEPER) | checking existing server keystore
+    stat:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
+    register: kafka_server_key
+
+  - name: ENCRYPTION OVERLAY (ZOOKEEPER) | ensure TLS {{ broker.application }} directory is present
+    file:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
+      state: directory
+      mode: 0755
+      owner: "{{ zookeeper_user }}"
+      group: "{{ zookeeper_group }}"
+    when: not kafka_server_key.stat.exists
+
+  - import_tasks: generate-client.yml
+    vars:
+      client_name: ZOOKEEPER
+      client_owner: "{{ zookeeper_user }}"
+      client_group: "{{ zookeeper_group }}"
+      client_handler: zookeeper
+
+  become: "{{ got_root | default('yes') }}"

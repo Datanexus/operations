@@ -39,9 +39,18 @@ broker:
     port: '9092'
     sslPort: '9091'
 zookeeper:
+  apache:
+    user: kafka
+    group: kafka
+    service_name: apache-zookeeper
+  confluent:
+    user: "{{ (got_root | default('yes')) | ternary('cp-kafka', ansible_user) }}"
+    group: "{{ (got_root | default('yes')) | ternary('confluent', ansible_user) }}"
+    service_name: confluent-zookeeper
   application: zookeeper
   config:
     port: '2181'
+  user_service: "{{ (got_root | default('yes')) | ternary('/usr/local/bin', confluent_root + '/bin')}}"
 connect:
   distributed:
     apache:

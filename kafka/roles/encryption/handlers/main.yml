@@ -201,3 +201,31 @@
     - got_root | default('yes')
     - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
     - ansible_distribution_version is version_compare('7', '<')
+
+- name: systemd zookeeper
+  listen: "restart zookeeper"
+  systemd:
+    name: "{{ zookeeper_service_name }}"
+    state: restarted
+  become: yes
+  when:
+    - got_root | default('yes')
+    - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - ansible_distribution_version is version_compare('7', '>=')
+
+- name: sysvinit zookeeper
+  listen: "restart zookeeper"
+  sysvinit:
+    name: "{{ zookeeper_service_name }}"
+    state: restarted
+  become: yes
+  when:
+    - got_root | default('yes')
+    - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - ansible_distribution_version is version_compare('7', '<')
+
+- name: user zookeeper
+  listen: "restart zookeeper"
+  command: "{{ zookeeper.user_service }}/zookeeper restart"
+  when:
+    - not got_root

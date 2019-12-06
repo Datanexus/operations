@@ -94,7 +94,7 @@
     register: unsigned_request
     
   - name: ENCRYPTION OVERLAY ({{ client_name }} CLIENT) | creating signing request from client keystore
-    command: keytool -keystore {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks -alias localhost -certreq -ext SAN=IP:{{ groups['kafka_public'] | join(',' +  'IP:') }} -file {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/unsigned-client-request -storepass {{ cert.storepass }}
+    command: keytool -keystore {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks -alias localhost -certreq -ext SAN=IP:{{ groups['kafka_public'] | join(',' +  'IP:') }} -file {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/unsigned-client-request -storepass {{ cert.storepass }} -keypass {{ cert.keypass }}
     when: not unsigned_request.stat.exists
     
   - name: ENCRYPTION OVERLAY ({{ client_name }} CLIENT) | checking existing {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/signed-client-cert
@@ -107,11 +107,11 @@
     when: not signed_cert.stat.exists
     
   - name: ENCRYPTION OVERLAY ({{ client_name }} CLIENT) | importing CA certificate into client keystore
-    command: keytool -keystore {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks -alias CARoot -import -file {{ shaw.config.tls_path }}/{{ tenant }}/ca/ca-cert -storepass {{ cert.storepass }} -noprompt
+    command: keytool -keystore {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks -alias CARoot -import -file {{ shaw.config.tls_path }}/{{ tenant }}/ca/ca-cert -storepass {{ cert.storepass }} -keypass {{ cert.keypass }} -noprompt
     when: not kafka_client_key.stat.exists
 
   - name: ENCRYPTION OVERLAY ({{ client_name }} CLIENT) | importing signed certificate into client keystore
-    command: keytool -keystore {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks -alias localhost -import -file {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/signed-client-cert -storepass {{ cert.storepass }} -noprompt
+    command: keytool -keystore {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.client.keystore.jks -alias localhost -import -file {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/signed-client-cert -storepass {{ cert.storepass }} -keypass {{ cert.keypass }} -noprompt
     when: not kafka_client_key.stat.exists
   
   - name: ENCRYPTION OVERLAY ({{ client_name }} CLIENT) | removing unnecessary files

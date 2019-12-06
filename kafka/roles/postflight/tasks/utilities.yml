@@ -21,6 +21,9 @@
 - set_fact:
     utils_path: "{{ (getent_passwd[broker.apache.user] is none) | ternary(dn_bin_path,apache_bin) }}"
 
+- set_fact: 
+    bin_suffix: "{{ (getent_passwd[broker.apache.user] is none) | ternary('', '.sh') }}"
+
 - getent:
     database: group
     key: "{{ broker.apache.group }}"

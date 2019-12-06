@@ -133,7 +133,7 @@
     
   # added SAN here???
   - name: ENCRYPTION OVERLAY (BROKER) | creating signing request from broker keystore
-    command: keytool -keystore {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.server.keystore.jks -alias localhost -certreq -ext SAN=IP:{{ hostvars[inventory_hostname].ansible_eth0.ipv4.address }} -file {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/unsigned-ca-request -storepass {{ cert.storepass }}
+    command: keytool -keystore {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.server.keystore.jks -alias localhost -certreq -ext SAN=IP:{{ hostvars[inventory_hostname].ansible_eth0.ipv4.address }} -file {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/unsigned-ca-request -storepass {{ cert.storepass }} -keypass {{ cert.keypass }}
     when: not unsigned_request.stat.exists
     
   - name: ENCRYPTION OVERLAY (BROKER) | checking existing signed ca cert
@@ -151,7 +151,7 @@
     when: not server_keystore.stat.exists
     
   - name: ENCRYPTION OVERLAY (BROKER) | importing signed server certificate into kafka.server.keystore.jks keystore
-    command: keytool -keystore {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.server.keystore.jks -alias localhost -import -file {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/signed-ca-cert -storepass {{ cert.storepass }} -noprompt
+    command: keytool -keystore {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/kafka.server.keystore.jks -alias localhost -import -file {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/signed-ca-cert -storepass {{ cert.storepass }} -keypass {{ cert.keypass }} -noprompt
     when: not server_keystore.stat.exists
   
   # this is purely so each broker can CLI consume-topic from the others; it has no effect on the broker functionality

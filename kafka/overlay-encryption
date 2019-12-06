@@ -8,6 +8,8 @@
 - name: ENCRYPTION OVERLAY (KAFKA) | discovering {{ cloud }} networking
   hosts: localhost
   connection: local
+  vars_files:
+     - "{{ tenant_config_path }}/config/{{ project }}.yml"
   gather_facts: no
   tasks:
     - include_role:
@@ -23,6 +25,8 @@
 - name: ENCRYPTION OVERLAY (KAFKA) | creating {{ cloud }} security groups
   hosts: localhost
   connection: local
+  vars_files:
+     - "{{ tenant_config_path }}/config/{{ project }}.yml"
   gather_facts: no
   tasks:
     - include_role:
@@ -33,6 +37,8 @@
 - name: ENCRYPTION OVERLAY (KAFKA) | applying {{ cloud }} security groups
   hosts: localhost
   connection: local
+  vars_files:
+     - "{{ tenant_config_path }}/config/{{ project }}.yml"
   gather_facts: yes
   tasks:
     - include_role:
@@ -131,6 +137,7 @@
     - "{{ tenant_config_path }}/config/site.yml"
     - "{{ tenant_config_path }}/config/applications/shaw.yml"
     - "{{ tenant_config_path }}/config/applications/confluent.yml"
+    - "{{ tenant_config_path }}/config/applications/apache.yml"
   gather_facts: yes
   tasks:
     - include_role:
@@ -155,6 +162,7 @@
     - "{{ tenant_config_path }}/config/site.yml"
     - "{{ tenant_config_path }}/config/applications/shaw.yml"
     - "{{ tenant_config_path }}/config/applications/confluent.yml"
+    - "{{ tenant_config_path }}/config/applications/apache.yml"
   gather_facts: yes
   tasks:
     - include_role:
@@ -185,6 +193,20 @@
         name: encryption
         tasks_from: encrypt-controlcenter
 
+- name: ENCRYPTION OVERLAY (KAFKA) | configuring cruise control encryption
+  hosts: cruisecontrol
+  vars_files:
+    - "{{ tenant_config_path }}/config/site.yml"
+    - "{{ tenant_config_path }}/config/applications/shaw.yml"
+    - "{{ tenant_config_path }}/config/applications/confluent.yml"
+    - "{{ tenant_config_path }}/config/applications/apache.yml"
+    - "{{ tenant_config_path }}/config/applications/cruisecontrol.yml"
+  gather_facts: yes
+  tasks:
+    - include_role:
+        name: encryption
+        tasks_from: encrypt-cruisecontrol
+
 # this is necessary before we build host groups from the ansible server
 - name: ENCRYPTION OVERLAY (KAFKA) | discovering kafka registry hosts
   hosts: registry
@@ -213,10 +235,23 @@
     - include_role:
         name: encryption
         tasks_from: encrypt-ksql
+
+- name: ENCRYPTION OVERLAY (KAFKA) | enabling zookeeper encryption libraries
+  hosts: zookeeper
+  vars_files:
+    - "{{ tenant_config_path }}/config/site.yml"
+    - "{{ tenant_config_path }}/config/applications/shaw.yml"
+    - "{{ tenant_config_path }}/config/applications/confluent.yml"
+    - "{{ tenant_config_path }}/config/applications/apache.yml"
+  gather_facts: yes
+  tasks:
+    - include_role:
+        name: encryption
+        tasks_from: encrypt-zookeeper
         
 # we run this because all broker interactions are now encrypted
 - name: ENCRYPTION OVERLAY (KAFKA) | completing postflight actions
-  hosts: zookeeper:kafka_broker:registry:controlcenter:kafka_connect:rest_proxy:kafka_ksql:kafka_replicator
+  hosts: zookeeper:kafka_broker:kafka_connect:registry:rest_proxy:kafka_ksql:kafka_replicator:controlcenter
   vars_files:
     - roles/encryption/defaults/main.yml
     - "{{ tenant_config_path }}/config/site.yml"
@@ -224,8 +259,8 @@
     - "{{ tenant_config_path }}/config/applications/apache.yml"
     - "{{ tenant_config_path }}/config/applications/confluent.yml"
   vars:
-      # this is semi clever; application gets set based on each host group
-      application: "{{ group_names | first }}"
+    # this is semi clever; application gets set based on each host group
+    application: "{{ group_names | first }}"
   gather_facts: no
   tasks:
     - include_role:

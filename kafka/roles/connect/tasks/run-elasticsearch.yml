@@ -122,14 +122,14 @@
       body_format: json
     with_items:
       - 'es_log_sink'
-      # - 'es_cpu_sink'
-      # - 'es_disk_sink'
-      # - 'es_diskio_sink'
-      # - 'es_kernel_sink'
+      - 'es_cpu_sink'
+      - 'es_disk_sink'
+      - 'es_diskio_sink'
+      - 'es_kernel_sink'
       - 'es_mem_sink'
-      # - 'es_processes_sink'
-      # - 'es_swap_sink'
-      # - 'es_system_sink'
+      - 'es_processes_sink'
+      - 'es_swap_sink'
+      - 'es_system_sink'
     when:
       - groups['connect_public'] | length > 0
   

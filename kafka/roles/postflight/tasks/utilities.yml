@@ -5,12 +5,32 @@
 ---
 - set_fact:
     apache_bin: "{{ apache.install_dir }}/kafka_{{ apache.packages.scala_version }}-{{ apache.packages.kafka_version }}/bin"
-    
+
 - set_fact:
     dn_bin_path: "{{ (got_root | default('yes')) | ternary('/usr/bin', (confluent_root + '/confluent-' + confluent.packages.confluent_version + '.' + confluent.packages.minor_release.split('-')[0] + '/bin')) }}"
 
+# we use the absence or presence of the apache user to make intelligent decisions
+- getent:
+    database: passwd
+    key: "{{ broker.apache.user }}"
+    fail_key: False
+
 - set_fact:
-    utils_path: "{{ (apache_kafka) | ternary(apache_bin, dn_bin_path) }}"
+    broker_user: "{{ (getent_passwd[broker.apache.user] is none) | ternary(broker.confluent.user, broker.apache.user) }}"
+
+- set_fact:
+    utils_path: "{{ (getent_passwd[broker.apache.user] is none) | ternary(dn_bin_path,apache_bin) }}"
+
+- set_fact: 
+    bin_suffix: "{{ (getent_passwd[broker.apache.user] is none) | ternary('', '.sh') }}"
+
+- getent:
+    database: group
+    key: "{{ broker.apache.group }}"
+    fail_key: False
+
+- set_fact:
+     broker_group: "{{ (getent_passwd[broker.apache.group] is none) | ternary(broker.confluent.group, broker.apache.group) }}"
 
 - block:
 
@@ -19,10 +39,10 @@
       src: consume-topic.j2
       dest: "{{ postflight.utilsDir }}/consume-topic"
       mode: 0755
-      owner: "{{ broker.user }}"
-      group: "{{ broker.group }}"
+      owner: "{{ broker_user }}"
+      group: "{{ broker_group }}"
     when:
       - groups['kafka_broker'] is defined
       - groups['kafka_broker'] | length > 0
-      
+
   become: "{{ got_root | default('yes') }}"

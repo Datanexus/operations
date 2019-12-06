@@ -2,7 +2,7 @@
 #
 # create AWS postgresql security group rules
 ---
-- name: ENCRYPTION OVERLAY (AWS) | updating confluent kafka broker private external security group
+- name: ENCRYPTION OVERLAY (AWS) | updating kafka broker private external security group
   local_action:
     module: ec2_group
     name: "dnsg_{{ project }}_kafka_private_external"

@@ -3,6 +3,19 @@
 #
 # enable connector encryption
 ---
+# these facts basically let us handle both apache and confluent
+- set_fact:
+    connect_user: "{{ (apache_kafka) | ternary(connect.distributed.apache.user, connect.distributed.confluent.user) }}"
+
+- set_fact:
+     connect_group: "{{ (apache_kafka) | ternary(connect.distributed.apache.group, connect.distributed.confluent.group) }}"
+
+- set_fact:
+    connect_service_name: "{{ (apache_kafka) | ternary(connect.distributed.apache.service_name, connect.distributed.confluent.service_name) }}"
+
+- set_fact:
+    connect_config_file: "{{ (apache_kafka) | ternary(connect.distributed.apache.config_file, connect.distributed.confluent.config_file) }}"
+
 - block:
   
   - name: ENCRYPTION OVERLAY (CONNECT) | checking existing server keystore
@@ -15,21 +28,21 @@
       path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
       state: directory
       mode: 0755
-      owner: "{{ connect.distributed.user }}"
-      group: "{{ connect.distributed.group }}"
+      owner: "{{ connect_user }}"
+      group: "{{ connect_group }}"
     when: not kafka_server_key.stat.exists
 
   - import_tasks: generate-client.yml
     vars:
       client_name: CONNECT
-      client_owner: "{{ connect.distributed.user }}"
-      client_group: "{{ connect.distributed.group }}"
+      client_owner: "{{ connect_user }}"
+      client_group: "{{ connect_group }}"
       client_handler: connect
   
   # cap number of brokers in config at 5
   - name: ENCRYPTION OVERLAY (CONNECT) | configuring bootstrap servers
     lineinfile:
-      path: "{{ connect.distributed.config_file }}"
+      path: "{{ connect_config_file }}"
       regexp: '^bootstrap.servers='
       line: "bootstrap.servers={{ groups['kafka_public'][:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}"
       insertafter: '^#bootstrap.servers='
@@ -37,7 +50,7 @@
   
   - name: ENCRYPTION OVERLAY (CONNECT) | enabling SSL
     blockinfile:
-      path: "{{ connect.distributed.config_file }}"
+      path: "{{ connect_config_file }}"
       marker: "# connect SSL {mark} ANSIBLE MANAGED BLOCK"
       insertafter: EOF
       state: present
@@ -52,7 +65,7 @@
   
   - name: ENCRYPTION OVERLAY (CONNECT) | enabling SSL for producers
     blockinfile:
-      path: "{{ connect.distributed.config_file }}"
+      path: "{{ connect_config_file }}"
       marker: "# producer SSL {mark} ANSIBLE MANAGED BLOCK"
       insertafter: EOF
       state: present
@@ -69,7 +82,7 @@
   # consumers for the replica cluster point to the source cluster
   - name: ENCRYPTION OVERLAY (CONNECT) | enabling SSL for consumers
     blockinfile:
-      path: "{{ connect.distributed.config_file }}"
+      path: "{{ connect_config_file }}"
       marker: "# consumer SSL {mark} ANSIBLE MANAGED BLOCK"
       insertafter: EOF
       state: present
@@ -85,7 +98,7 @@
 
   - name: ENCRYPTION OVERLAY (CONNECT) | enabling SSL for monitoring producers
     blockinfile:
-      path: "{{ connect.distributed.config_file }}"
+      path: "{{ connect_config_file }}"
       marker: "# monitoring producer SSL {mark} ANSIBLE MANAGED BLOCK"
       insertafter: EOF
       state: present
@@ -101,7 +114,7 @@
 
   - name: ENCRYPTION OVERLAY (CONNECT) | enabling SSL for monitoring consumers
     blockinfile:
-      path: "{{ connect.distributed.config_file }}"
+      path: "{{ connect_config_file }}"
       marker: "# monitoring consumer SSL {mark} ANSIBLE MANAGED BLOCK"
       insertafter: EOF
       state: present

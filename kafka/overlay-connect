@@ -64,15 +64,37 @@
   hosts: localhost
   gather_facts: no
   tasks:
-    - name: KAFKA CONNECTOR OVERLAY | building broker source public internal host group
-      add_host: hostname="{{ hostvars[item].ansible_default_ipv4.address }}" groupname=broker_source_public
+    # eth0 is the data plane in a single interface system
+    - name: KAFKA OVERLAY | building eth0 broker source host group
+      add_host: hostname="{{ hostvars[item].ansible_eth0.ipv4.address }}" groupname=broker_source_public
       with_items: "{{ groups['broker_source'] }}"
-      when: "'broker_source' in groups | default([])"
-      
-    - name: KAFKA CONNECTOR OVERLAY | building broker destination public internal host group
-      add_host: hostname="{{ hostvars[item].ansible_default_ipv4.address }}" groupname=broker_destination_public
+      when:
+        - "'broker_source' in groups | default([])"
+        - hostvars[item].ansible_eth1 is not defined
+
+    # eth1 is the dataplane in a multi interface system
+    - name: KAFKA OVERLAY | building eth1 broker source host group
+      add_host: hostname="{{ hostvars[item].ansible_eth1.ipv4.address }}" groupname=broker_source_public
+      with_items: "{{ groups['broker_source'] }}"
+      when:
+        - "'broker_source' in groups | default([])"
+        - hostvars[item].ansible_eth1 is defined
+    
+    # eth0 is the data plane in a single interface system
+    - name: KAFKA OVERLAY | building eth0 broker destination host group
+      add_host: hostname="{{ hostvars[item].ansible_eth0.ipv4.address }}" groupname=broker_destination_public
       with_items: "{{ groups['broker_destination'] }}"
-      when: "'broker_destination' in groups | default([])"
+      when:
+        - "'broker_destination' in groups | default([])"
+        - hostvars[item].ansible_eth1 is not defined
+
+    # eth1 is the dataplane in a multi interface system
+    - name: KAFKA OVERLAY | building eth1 broker destination host group
+      add_host: hostname="{{ hostvars[item].ansible_eth1.ipv4.address }}" groupname=broker_destination_public
+      with_items: "{{ groups['broker_destination'] }}"
+      when:
+        - "'broker_destination' in groups | default([])"
+        - hostvars[item].ansible_eth1 is defined
       
 # this is necessary before we build host groups from the ansible server
 - name: OPERATIONS OVERLAY (KAFKA CONNECT) | discovering elasticsearch facts
@@ -84,11 +106,22 @@
   hosts: localhost
   gather_facts: no
   tasks:
-    - name: KAFKA OVERLAY | building elasticsearch public internal host group
-      add_host: hostname="{{ hostvars[item].ansible_default_ipv4.address }}" groupname=elasticsearch_public
+    # eth0 is the data plane in a single interface system
+    - name: KAFKA OVERLAY | building eth0 elasticsearch host group
+      add_host: hostname="{{ hostvars[item].ansible_eth0.ipv4.address }}" groupname=elasticsearch_public
       with_items: "{{ groups['elasticsearch'] }}"
-      when: "'elasticsearch' in groups | default([])"
+      when:
+        - "'elasticsearch' in groups | default([])"
+        - hostvars[item].ansible_eth1 is not defined
 
+    # eth1 is the dataplane in a multi interface system
+    - name: KAFKA OVERLAY | building eth1 elasticsearch host group
+      add_host: hostname="{{ hostvars[item].ansible_eth1.ipv4.address }}" groupname=elasticsearch_public
+      with_items: "{{ groups['elasticsearch'] }}"
+      when:
+        - "'elasticsearch' in groups | default([])"
+        - hostvars[item].ansible_eth1 is defined
+        
 # this is necessary before we build host groups from the ansible server
 - name: OPERATIONS OVERLAY (KAFKA CONNECT) | discovering connect facts
   hosts: kafka_connect
@@ -99,10 +132,21 @@
   hosts: localhost
   gather_facts: no
   tasks:
-    - name: OPERATIONS OVERLAY (KAFKA CONNECT) | building kafka connect public internal host group
-      add_host: hostname="{{ hostvars[item].ansible_default_ipv4.address }}" groupname=connect_public
+    # eth0 is the data plane in a single interface system
+    - name: KAFKA OVERLAY | building eth0 connect host group
+      add_host: hostname="{{ hostvars[item].ansible_eth0.ipv4.address }}" groupname=connect_public
       with_items: "{{ groups['kafka_connect'] }}"
-      when: "'kafka_connect' in groups | default([])"
+      when:
+        - "'kafka_connect' in groups | default([])"
+        - hostvars[item].ansible_eth1 is not defined
+
+    # eth1 is the dataplane in a multi interface system
+    - name: KAFKA OVERLAY | building eth1 connect host group
+      add_host: hostname="{{ hostvars[item].ansible_eth1.ipv4.address }}" groupname=connect_public
+      with_items: "{{ groups['kafka_connect'] }}"
+      when:
+        - "'kafka_connect' in groups | default([])"
+        - hostvars[item].ansible_eth1 is defined
 
 - name: OPERATIONS OVERLAY (KAFKA CONNECT) | configuring connectors
   hosts: kafka_connect

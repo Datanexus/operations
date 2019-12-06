@@ -17,7 +17,7 @@ fi
 # we want to verify the topic exists before we consume it
 {{ postflight.utilsDir }}/list-topics | grep $1 &> /dev/null
  if [ $? == 0 ]; then
-   {{ utils_path }}/kafka-console-consumer --bootstrap-server $BROKER_HOSTS --topic $1 --from-beginning --consumer.config {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/client-ssl.properties
+   {{ utils_path }}/kafka-console-consumer{{ bin_suffix }} --bootstrap-server $BROKER_HOSTS --topic $1 --from-beginning --consumer.config {{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}/client-ssl.properties
  else
    printf "$1 topic does not exist!\n"
    exit 1

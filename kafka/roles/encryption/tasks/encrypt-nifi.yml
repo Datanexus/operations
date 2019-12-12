@@ -1,0 +1,29 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+# Licensed software not for distribution
+#
+# enables nifi to have keystores
+--- 
+- block:
+
+  - name: ENCRYPTION OVERLAY (NIFI) | checking existing server keystore
+    stat:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
+    register: kafka_server_key
+
+  - name: ENCRYPTION OVERLAY (NIFI) | ensure TLS {{ broker.application }} directory is present
+    file:
+      path: "{{ shaw.config.tls_path }}/{{ tenant }}/{{ broker.application }}"
+      state: directory
+      mode: 0755
+      owner: "{{ nifi.user }}"
+      group: "{{ nifi.group }}"
+    when: not kafka_server_key.stat.exists
+
+  - import_tasks: generate-client.yml
+    vars:
+      client_name: NIFI
+      client_owner: "{{ nifi.user }}"
+      client_group: "{{ nifi.group }}"
+      client_handler: nifi
+
+  become: "{{ got_root | default('yes') }}"

@@ -248,7 +248,20 @@
     - include_role:
         name: encryption
         tasks_from: encrypt-zookeeper
-        
+
+- name: ENCRYPTION OVERLAY (KAFKA) | enabling nifi encryption libraries
+  hosts: nifi
+  vars_files:
+    - "{{ tenant_config_path }}/config/site.yml"
+    - "{{ tenant_config_path }}/config/applications/shaw.yml"
+    - "{{ tenant_config_path }}/config/applications/confluent.yml"
+    - "{{ tenant_config_path }}/config/applications/apache.yml"
+  gather_facts: yes
+  tasks:
+    - include_role:
+        name: encryption
+        tasks_from: encrypt-nifi
+
 # we run this because all broker interactions are now encrypted
 - name: ENCRYPTION OVERLAY (KAFKA) | completing postflight actions
   hosts: zookeeper:kafka_broker:kafka_connect:registry:rest_proxy:kafka_ksql:kafka_replicator:controlcenter

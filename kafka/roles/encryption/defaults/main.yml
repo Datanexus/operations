@@ -51,6 +51,13 @@ zookeeper:
   config:
     port: '2181'
   user_service: "{{ (got_root | default('yes')) | ternary('/usr/local/bin', confluent_root + '/bin')}}"
+nifi:
+  user: nifi
+  group: nifi
+  service_name: nifi
+  config:
+    port: '8080'
+  user_service: /usr/local/bin
 connect:
   distributed:
     apache:

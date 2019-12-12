@@ -229,3 +229,14 @@
   command: "{{ zookeeper.user_service }}/zookeeper restart"
   when:
     - not got_root
+
+- name: systemd nifi
+  listen: "restart nifi"
+  systemd:
+    name: "{{ nifi.service_name }}"
+    state: restarted
+  become: yes
+  when:
+    - got_root | default('yes')
+    - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - ansible_distribution_version is version_compare('7', '>=')

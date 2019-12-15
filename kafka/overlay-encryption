@@ -249,6 +249,7 @@
         name: encryption
         tasks_from: encrypt-zookeeper
 
+# nifi flows need to have this available to talk to the brokers
 - name: ENCRYPTION OVERLAY (KAFKA) | enabling nifi encryption libraries
   hosts: nifi
   vars_files:

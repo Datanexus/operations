@@ -205,6 +205,17 @@
     when:
       - groups['controlcenter'] is defined or groups['controlcenter_broker'] is defined
     notify: restart broker
+  
+  # cap number of brokers in config at 5
+  - name: ENCRYPTION OVERLAY (BROKER) | updating cruise control metrics bootstrap servers for {{broker.service_name }}
+    lineinfile:
+      path: "{{ broker_config_file }}"
+      regexp: '^cruise.control.metrics.reporter.bootstrap.servers='
+      line: "cruise.control.metrics.reporter.bootstrap.servers={{ groups['kafka_public'][:5] | join(':' + broker.config.sslPort + ',') }}:{{ broker.config.sslPort }}"
+      insertafter: '^#confluent.metrics.reporter.bootstrap.servers='
+    when:
+      - groups['cruisecontrol'] is defined or groups['cruisecontrol_broker'] is defined
+    notify: restart broker
 
   - name: ENCRYPTION OVERLAY (BROKER) | configuring SSL for metrics reporting
     blockinfile:
